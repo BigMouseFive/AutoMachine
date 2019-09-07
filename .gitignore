@@ -1,7 +1,6 @@
 __pycache__/
 .idea/
 chrome_*
-*.db
 *.debuginfo
 *.txt
 *.log

@@ -245,50 +245,42 @@ class OperateProcess(multiprocessing.Process):
                             ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
                             "//div[@class='jsx-3793681198 text']")
                     if not(len(e1) == 1 or len(e2) == 1):
-                        print("test0")
                         continue
                     elemProducts = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
                     if len(elemProducts) >= 1:
-                        print("test1:" + str(len(elemProducts)))
                         elemProduct = self.chrome.find_elements_by_xpath(
                             ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
                             "//div[@class='jsx-3793681198 text']")
                         if len(elemProduct) == 1:
-                            print("test2")
                             product_url = ""
                             url_bak = ""
                             break
                         if len(elemProducts) == 1:
-                            print("test3")
                             elemProduct = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a")
                             product_url = str(elemProduct[0].get_attribute("href"))
                             if product_url != url_bak:
-                                print("test33")
                                 url_bak = product_url
                                 break
                         else:
                             if variant_name == "":
-                                print("test4")
                                 product_url = ""
                                 url_bak = ""
                                 break
-                            print("test5:" + variant_name)
                             for elemProduct in elemProducts:
                                 key = elemProduct.find_elements_by_xpath(".//div[text()='Variant']")
-                                print("test6:" + str(len(key)))
                                 if len(key) == 1:
                                     value = key[0].find_elements_by_xpath("./following-sibling::div[1]")
-                                    print("test7:" + str(len(value)))
                                     print(value[0].text)
                                     if len(value) == 1 and value[0].text[0] == variant_name[0] and value[0].text in variant_name:
                                         elemProduct = elemProduct.find_elements_by_xpath("./td[1]//a")
-                                        print("test8:" + str(len(elemProduct)))
                                         if len(elemProduct) == 1:
                                             product_url = str(elemProduct[0].get_attribute("href"))
-                                            print("product_url:" + product_url + ": " + url_bak)
                                             if product_url != url_bak:
                                                 url_bak = product_url
                                                 raise FileExistsError
+                            product_url = ""
+                            url_bak = ""
+                            break
             except FileExistsError:
                 a = 1
             except:
