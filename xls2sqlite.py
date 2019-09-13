@@ -16,13 +16,8 @@ class X2S:
             exit(-1)
         self.dst = dst
 
-    def addWhiteList(self):
+    def addWhiteList(self, shop_name):
         conn = sqlite3.connect(self.dst)
-        conn.execute('''CREATE TABLE IF NOT EXISTS 'white_list'
-                     (ean       TEXT    NOT NULL,
-                     variant_name TEXT NOT NULL DEFAULT '',
-                     primary key (ean, variant_name));''')
-        conn.commit()
         try:
             sheet = self.xls.sheet_by_index(0)
             count = 0
@@ -30,11 +25,12 @@ class X2S:
                 v = sheet.cell(i, 0).value
                 if len(v) == 10 and v[0] == 'N':
                     count += 1
-                    conn.execute("REPLACE INTO 'white_list' (ean, variant_name) values(?,'')", (v,))
+                    conn.execute("REPLACE INTO 'whiteList' (shop, ean, variant_name) values(?,?,'')", (shop_name, v))
                     print(str(count) + ":" + v)
             conn.commit()
             print("共获取到" + str(count) + "个")
         except:
+            raise
             print("获取表格内容错误")
             conn.close()
             os.system("pause")
@@ -62,7 +58,8 @@ class X2S:
             ret = conn.execute("select my_shop from 'CPAttr' where shop=?;", (shop_name,)).fetchall()
             if len(ret) <= 0:
                 raise ValueError
-            my_shop += ret[0][0].split(",")
+            if len(ret[0][0]) > 0:
+                my_shop += ret[0][0].split(",")
             my_shop = ",".join(i for i in set(my_shop))
             conn.execute("update 'CPAttr' set my_shop=? where shop=?;", (my_shop, shop_name))
             conn.commit()
@@ -71,6 +68,31 @@ class X2S:
             conn.close()
             os.system("pause")
             exit(-1)
+        conn.close()
+
+    def addProductAttr(self, shop_name):
+        conn = sqlite3.connect(self.dst)
+        try:
+            sheet = self.xls.sheet_by_index(0)
+            count = 0
+            for i in range(0, sheet.nrows):
+                v1 = sheet.cell(i, 0).value
+                v2 = sheet.cell(i, 1).value
+                v3 = sheet.cell(i, 2).value
+                try:
+                    v2 = float(v2)
+                    v3 = int(v3)
+                    conn.execute("REPLACE INTO 'CPComplexAttr'(shop, ean, least_price, max_times) VALUES (?, ?, ?, ?);",(shop_name, v1, v2, v3))
+                    count += 1
+                    print(str(count) + ":" + str(v1) + "," + str(v2) + "," + str(v3))
+                except:
+                    print("表格内容错误，第" + str(i+1) + "行")
+        except:
+            print("获取表格内容错误")
+            conn.close()
+            os.system("pause")
+            exit(-1)
+        conn.commit()
         conn.close()
 
 
@@ -115,17 +137,13 @@ class S2X:
             self.xls.save(self.dst)
             print("导出到表格成功")
         except:
-            raise
             print("导出到表格失败")
             os.system("pause")
             exit(-1)
 
 
-s2x = S2X("D:/Utils/AutoMachine/VisualStudio2013WorkPlatform/automachine/BuyMore.db", "C:/Users/79054/Desktop/record.xls")
-s2x.exportGoldCar()
-
-# method = sys.argv[1]
-method = ""
+os.system("title AutoMachine Helper")
+method = sys.argv[1]
 if method == "GoldCar":
     # 注意 xlwt 是以xls方式保存表格的 所以保存的文件名后缀得是xls
     s2x = S2X(sys.argv[2], sys.argv[3])
@@ -135,6 +153,13 @@ elif method == "WhiteShop":
     x2s.addWhiteShop(sys.argv[4])
 elif method == "WhiteList":
     x2s = X2S(sys.argv[2], sys.argv[3])
-    x2s.addWhiteList()
+    x2s.addWhiteList(sys.argv[4])
+elif method == "ProductAttr":
+    x2s = X2S(sys.argv[2], sys.argv[3])
+    x2s.addProductAttr(sys.argv[4])
 
 
+# a = X2S("C:/Users/79054/Desktop/record.xls", "D:/Utils/AutoMachine/VisualStudio2013WorkPlatform/lemon01/x64/Debug/DataBase.db")
+# a.addWhiteList("BuyMore")
+# a = S2X("D:/Utils/AutoMachine/VisualStudio2013WorkPlatform/automachine/pak_installer/dist/deprecated/BuyMore.db", "C:/Users/79054/Desktop/record.xls")
+# a.exportGoldCar()

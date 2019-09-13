@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from multiprocessing import freeze_support
-import os
-from colorama import init
+import os, sys
 from DataManager import DataManager
 from OperateProcess import OperateProcess
 from SpiderProcess import SpiderProcess
@@ -21,14 +20,15 @@ def pre_test(name):
             print("PermissionError")
 
 
-def skr(name):
+def skr(name):  
     if __name__ == '__main__':
+        os.system("title AutoMacine " + name)
         freeze_support()
         os.chdir(os.path.split(os.path.realpath(__file__))[0])
-        # pre_test(name)
+        pre_test(name)
         p1 = OperateProcess(name)
         p1.start()
-        while False:
+        while True:
             p = SpiderProcess(name=name)
             p.start()
             p.join()
@@ -36,7 +36,6 @@ def skr(name):
             database.handlerStatus()
 
 
-init(autoreset=True)
-skr("BuyMore")
-# os.system("title AutoMacine " + sys.argv[1])
-# skr(sys.argv[1])
+# skr("BuyMore")
+skr(sys.argv[1])
+

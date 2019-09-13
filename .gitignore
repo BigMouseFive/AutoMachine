@@ -4,3 +4,5 @@ chrome_*
 *.debuginfo
 *.txt
 *.log
+pak_installer/dist
+pak_installer/build

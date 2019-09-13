@@ -7,16 +7,18 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from colorama import Fore
 from DataManager import DataManager
+CHROME_DRIVER_PATH = "../chromedriver.exe"
 
 
 def printYellow(mess):
-    print(Fore.YELLOW + mess)
+    # print(Fore.YELLOW + mess)
+    print(mess)
 
 
 def printRed(mess):
-    print(Fore.RED + mess)
+    # print(Fore.RED + mess)
+    print(mess)
 
 
 class OperateProcess(multiprocessing.Process):
@@ -35,9 +37,6 @@ class OperateProcess(multiprocessing.Process):
         self.database = DataManager(self.name)
         printYellow("启动后台改价任务")
         while 1:
-            # user_dir = "./chrome_" + self.name
-            # if not os.path.exists(user_dir):
-            #     os.mkdir(user_dir)
             option = webdriver.ChromeOptions()
             option.add_argument("headless")
             # option.add_argument("user-data-dir=" + user_dir)
@@ -52,7 +51,7 @@ class OperateProcess(multiprocessing.Process):
                 }
             }
             option.add_experimental_option('prefs', prefs)
-            self.chrome = webdriver.Chrome(executable_path="./chromedriver.exe", chrome_options=option)
+            self.chrome = webdriver.Chrome(executable_path=CHROME_DRIVER_PATH, chrome_options=option)
             self.chrome.maximize_window()
             try:
                 self.LoginAccount()
@@ -73,6 +72,8 @@ class OperateProcess(multiprocessing.Process):
             elemLogin = self.chrome.find_elements_by_xpath(".//div[@class='jsx-1240009043 group']/input")
             elemNewLoginBtn = self.chrome.find_element_by_xpath(
                 ".//button[@class='jsx-1789715842 base ripple primary uppercase fullWidth']")
+            elemLogin[0].clear()
+            elemLogin[1].clear()
             elemLogin[0].send_keys(account)
             elemLogin[1].send_keys(password)
             elemNewLoginBtn.click()
@@ -92,6 +93,11 @@ class OperateProcess(multiprocessing.Process):
                 raise
 
     def NewInventory(self):
+        if not self.database.shopLock():
+            printYellow("后台：已经超出店铺数量限制")
+            self.database.setStopStatus()
+            while True:
+                time.sleep(6000)
         printYellow("后台：打开改价页面")
         self.loginHandler = self.chrome.current_window_handle
         handlers = self.chrome.window_handles
@@ -234,7 +240,7 @@ class OperateProcess(multiprocessing.Process):
             self.chrome.switch_to.window(self.inventoryHandler)
             try:
                 xpath = './/div[@class="jsx-3807287210 searchWrapper"]'
-                WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
+                WebDriverWait(self.chrome, 100, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                 elemSearch = self.chrome.find_element_by_xpath('.//div[@class="jsx-3807287210 searchWrapper"]//input')
                 elemSearch.clear()
                 elemSearch.send_keys(ean)
@@ -270,8 +276,7 @@ class OperateProcess(multiprocessing.Process):
                                 key = elemProduct.find_elements_by_xpath(".//div[text()='Variant']")
                                 if len(key) == 1:
                                     value = key[0].find_elements_by_xpath("./following-sibling::div[1]")
-                                    print(value[0].text)
-                                    if len(value) == 1 and value[0].text[0] == variant_name[0] and value[0].text in variant_name:
+                                    if len(value[0].text) > 0 and len(value) == 1 and value[0].text[0] == variant_name[0] and value[0].text in variant_name:
                                         elemProduct = elemProduct.find_elements_by_xpath("./td[1]//a")
                                         if len(elemProduct) == 1:
                                             product_url = str(elemProduct[0].get_attribute("href"))
@@ -303,6 +308,7 @@ class OperateProcess(multiprocessing.Process):
                     elemInput = self.chrome.find_element_by_xpath(xpath)
                 elemInput.clear()
                 elemInput.send_keys(str(price))
+                out += "[" + elemInput.get_attribute("value") + "]"
                 xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
                 WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                 elemBtn = self.chrome.find_element_by_xpath(xpath)
