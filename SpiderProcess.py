@@ -191,7 +191,7 @@ class QuotesSpider(scrapy.Spider):
                             out = "情况C " + out + "\t差价比[" + str(round(diff1 * 100, 2)) + "%]\t改价为[" + str(price) + "]"
                 else:
                     price = round(infos[self.shop_name][0] - attr["lowwer"], 2)
-                    if price < min(infos[gold_shop][0], attr["self_least_price"]):
+                    if price < max(infos[gold_shop][0], attr["self_least_price"]):
                         out = "情况D " + out + "\t不修改"
                     else:
                         self.database.needToChangePrice(ean, price, gold_shop, variant_name)

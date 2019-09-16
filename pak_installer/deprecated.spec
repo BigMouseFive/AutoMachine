@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['..\\deprecated.py'],
-             pathex=['../DataManager.py', '../SpiderProcess.py', '../OperateProcess.py', 'D:\\Utils\\AutoMachine\\VisualStudio2013WorkPlatform\\automachine\\pak_installer'],
+             pathex=['../DataManager.py', '../SpiderProcess.py', '../OperateProcess.py', 'C:\\D\\Github\\AutoMachine\\pak_installer'],
              binaries=[],
              datas=[],
              hiddenimports=[],

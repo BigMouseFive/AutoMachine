@@ -38,6 +38,31 @@ class DataManager:
                                     price     DOUBLE  NOT NULL,
                                     shop      TEXT    NOT NULL,
                                     primary key (ean, variant_name));''')
+        c.execute("DROP TABLE IF EXISTS 'change';")
+        c.execute('''CREATE TABLE 'change'
+                                           (ean           TEXT   NOT NULL,
+                                            variant_name  TEXT   NOT NULL DEFAULT '',
+                                            all_price     TEXT   NOT NULL,
+                                            count         INT    NOT NULL,
+                                            primary key (ean, variant_name));''')
+        conn.commit()
+        conn.close()
+        self.lock.release()
+
+    def isLowerThanMatTimes(self, ean, variant_name):
+        self.lock.acquire()
+        self.lock.release()
+
+    def addAChange(self, ean, variant_name, old_price, price):
+        self.lock.acquire()
+        conn = sqlite3.connect(self.name + ".db")
+        ret = conn.execute("select * from 'change' where ean=?", (ean,)).fetchall()
+        if len(ret) <= 0:
+            price = str(old_price) + "," + str(price)
+            conn.execute("insert into 'change'(ean, variant_name, all_price, count) values (?,?,?,1);",
+                         (ean, variant_name, price))
+        else:
+            conn.execute("update 'change' set all_price=all_price||?, count=count+1;", (str(price),))
         conn.commit()
         conn.close()
         self.lock.release()
@@ -45,34 +70,53 @@ class DataManager:
     def getAttr(self, ean):
         self.lock.acquire()
         attr = {"self_least_price": 0, "minute": 0,
-                "max_times": 5, "max_percent": 0.2,
                 "percent": 0.1, "lowwer": 0,
-                "control": 0, "my_shop": [str(self.name).lower()]}
+                "my_shop": [str(self.name).lower()]}
         conn = sqlite3.connect(DATABASE_PATH)
         # 通用改价参数
         try:
-            ret = conn.execute(
-                "select minute,max_times,max_percent,percent,lowwer,control,my_shop from 'CPAttr' where shop=?;",
-                (self.name,)).fetchall()
+            ret = conn.execute("select minute,percent,lowwer,my_shop from 'CPAttr' where shop=?;", (self.name,)).fetchall()
             if len(ret) > 0:
                 attr["minute"] = ret[0][0]
-                attr["max_times"] = ret[0][1]
-                attr["max_percent"] = ret[0][2]
-                attr["percent"] = ret[0][3]
-                attr["lowwer"] = ret[0][4]
-                attr["control"] = ret[0][5]
-                attr["my_shop"] += ret[0][6].lower().strip().split(",")
+                attr["percent"] = ret[0][1]
+                attr["lowwer"] = ret[0][2]
+                attr["my_shop"] += ret[0][3].lower().strip().split(",")
         except:
             raise
 
         # 具体某个产品的最低价
         try:
-            ret = conn.execute("select least_price from 'CPConplexAttr' where ean=? and shop=?;",
+            ret = conn.execute("select least_price from 'CPComplexAttr' where ean=? and shop=?;",
                                (ean, self.name)).fetchall()
             if len(ret) > 0:
                 attr["self_least_price"] = ret[0][0]
         except:
             attr["self_least_price"] = 0
+
+        conn.close()
+        self.lock.release()
+        return attr
+
+    def getAttr2(self, ean):
+        self.lock.acquire()
+        attr = {"max_times": 0, "max_percent": 0}
+        conn = sqlite3.connect(DATABASE_PATH)
+        # # 通用改价参数
+        # try:
+        #     ret = conn.execute("select max_times,max_percent from 'CPAttr' where shop=?;", (self.name,)).fetchall()
+        #     if len(ret) > 0:
+        #         attr["max_times"] = ret[0][0]
+        #         attr["max_percent"] = ret[0][1]
+        # except:
+        #     raise
+
+        # 具体某个产品的最低价
+        try:
+            ret = conn.execute("select max_times from 'CPComplexAttr' where ean=? and shop=?;", (ean, self.name)).fetchall()
+            if len(ret) > 0:
+                attr["max_times"] = ret[0][0]
+        except:
+            attr["max_times"] = 0
 
         conn.close()
         self.lock.release()

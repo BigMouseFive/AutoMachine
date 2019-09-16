@@ -5,6 +5,7 @@ import json
 import traceback
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from DataManager import DataManager
@@ -25,6 +26,7 @@ class OperateProcess(multiprocessing.Process):
     def __init__(self, name):
         multiprocessing.Process.__init__(self)  # 重构了Process类里面的构造函数
         self.name = name
+        self.record = {}  # {"ean":[price, count]}
 
     def exceptHandler(self, info):
         info = time.strftime("%Y-%m-%d %H:%M:%S") + "\n" + info
@@ -240,7 +242,7 @@ class OperateProcess(multiprocessing.Process):
             self.chrome.switch_to.window(self.inventoryHandler)
             try:
                 xpath = './/div[@class="jsx-3807287210 searchWrapper"]'
-                WebDriverWait(self.chrome, 100, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
+                WebDriverWait(self.chrome, 120, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                 elemSearch = self.chrome.find_element_by_xpath('.//div[@class="jsx-3807287210 searchWrapper"]//input')
                 elemSearch.clear()
                 elemSearch.send_keys(ean)
@@ -307,12 +309,21 @@ class OperateProcess(multiprocessing.Process):
                     xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_sa']"
                     elemInput = self.chrome.find_element_by_xpath(xpath)
                 elemInput.clear()
+                elemInput.sendKeys(Keys.BACK_SPACE)
+                elemInput.sendKeys(Keys.CONTROL + "a")
+                elemInput.sendKeys(Keys.DELETE)
+                elemInput.sendKeys(value)
                 elemInput.send_keys(str(price))
-                out += "[" + elemInput.get_attribute("value") + "]"
                 xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
                 WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                 elemBtn = self.chrome.find_element_by_xpath(xpath)
                 self.chrome.execute_script("arguments[0].click()", elemBtn)
+                if ean in self.record:
+                    self.record[ean][0] = price
+                    self.record[ean][1] += 1
+                else:
+                    self.record[ean] = [price, 1]
+                out += "[第" + str(self.record[ean][1]) + "次]"
                 printYellow("后台：" + out + "\t改价成功")
                 # time.sleep(10)
             except:
