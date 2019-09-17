@@ -41,9 +41,7 @@ class OperateProcess(multiprocessing.Process):
         while 1:
             option = webdriver.ChromeOptions()
             option.add_argument("headless")
-            # option.add_argument("user-data-dir=" + user_dir)
             option.add_argument('ignore-certificate-errors')
-            option.add_argument('ignore-ssl-errors')
             option.add_argument('log-level=3')
             option.add_argument('lang=zh_CN.UTF-8')
             prefs = {
@@ -229,7 +227,7 @@ class OperateProcess(multiprocessing.Process):
             self.database.finishOneChangeItem(ean, price, variant_name)
 
     def OperateProductSelenium(self):
-        global product_url, elemProduct
+        global product_url, elemProduct, debug_out
         printYellow("后台：开始改价")
         url_bak = ""
         while True:
@@ -246,6 +244,7 @@ class OperateProcess(multiprocessing.Process):
                 elemSearch = self.chrome.find_element_by_xpath('.//div[@class="jsx-3807287210 searchWrapper"]//input')
                 elemSearch.clear()
                 elemSearch.send_keys(ean)
+                debug_out = ""
                 while 1:
                     time.sleep(1.5)
                     e1 = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a")
@@ -254,37 +253,54 @@ class OperateProcess(multiprocessing.Process):
                             "//div[@class='jsx-3793681198 text']")
                     if not(len(e1) == 1 or len(e2) == 1):
                         continue
+                    debug_out += "1"
                     elemProducts = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
                     if len(elemProducts) >= 1:
+                        debug_out += "2"
                         elemProduct = self.chrome.find_elements_by_xpath(
                             ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
                             "//div[@class='jsx-3793681198 text']")
                         if len(elemProduct) == 1:
+                            debug_out += "3"
                             product_url = ""
                             url_bak = ""
                             break
                         if len(elemProducts) == 1:
+                            debug_out += "4"
                             elemProduct = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a")
                             product_url = str(elemProduct[0].get_attribute("href"))
                             if product_url != url_bak:
+                                debug_out += "5"
                                 url_bak = product_url
                                 break
                         else:
+                            debug_out += "6"
+                            e1 = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a")
+                            if not len(e1) == 1:
+                                debug_out += "$"
+                                continue
                             if variant_name == "":
+                                debug_out += "7"
                                 product_url = ""
                                 url_bak = ""
                                 break
                             for elemProduct in elemProducts:
+                                debug_out += "8"
                                 key = elemProduct.find_elements_by_xpath(".//div[text()='Variant']")
                                 if len(key) == 1:
                                     value = key[0].find_elements_by_xpath("./following-sibling::div[1]")
+                                    debug_out += "9" + value[0].text
                                     if len(value[0].text) > 0 and len(value) == 1 and value[0].text[0] == variant_name[0] and value[0].text in variant_name:
                                         elemProduct = elemProduct.find_elements_by_xpath("./td[1]//a")
+                                        debug_out += "0"
                                         if len(elemProduct) == 1:
+                                            debug_out += "|"
                                             product_url = str(elemProduct[0].get_attribute("href"))
                                             if product_url != url_bak:
+                                                debug_out += "!"
                                                 url_bak = product_url
                                                 raise FileExistsError
+                            debug_out += "#"
                             product_url = ""
                             url_bak = ""
                             break
@@ -294,41 +310,51 @@ class OperateProcess(multiprocessing.Process):
                 raise
             if product_url == "" or len(elemProduct) != 1:
                 printRed("后台：" + out + "\t没找到这个产品")
+                printRed("\n\n" + debug_out + "\n\n")
                 self.database.finishOneChangeItem(ean, price, variant_name)
                 continue
             self.chrome.execute_script("arguments[0].click()", elemProduct[0])
             # self.chrome.switch_to.window(self.loginHandler)
             # js = 'window.location.replace("' + product_url + '")'
             # self.chrome.execute_script(js)
-            try:
-                xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='sale_price_sa']"
-                WebDriverWait(self.chrome, 40, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                elemInput = self.chrome.find_element_by_xpath(xpath)
-                value = elemInput.get_attribute("value")
-                if value is None or value == "value" or len(value) == 0:
-                    xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_sa']"
+            change_count, flag = self.database.isLowerThanMaxTimes(ean, variant_name)
+            if flag:
+                try:
+                    xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='sale_price_sa']"
+                    WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                     elemInput = self.chrome.find_element_by_xpath(xpath)
-                elemInput.clear()
-                elemInput.sendKeys(Keys.BACK_SPACE)
-                elemInput.sendKeys(Keys.CONTROL + "a")
-                elemInput.sendKeys(Keys.DELETE)
-                elemInput.sendKeys(value)
-                elemInput.send_keys(str(price))
-                xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
-                WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                elemBtn = self.chrome.find_element_by_xpath(xpath)
-                self.chrome.execute_script("arguments[0].click()", elemBtn)
-                if ean in self.record:
-                    self.record[ean][0] = price
-                    self.record[ean][1] += 1
-                else:
-                    self.record[ean] = [price, 1]
-                out += "[第" + str(self.record[ean][1]) + "次]"
-                printYellow("后台：" + out + "\t改价成功")
-                # time.sleep(10)
-            except:
-                self.exceptHandler(traceback.format_exc())
-                printRed("后台：" + out + "\t改价失败")
+                    value = elemInput.get_attribute("value")
+                    if value is None or value == "value" or len(value) == 0:
+                        xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_sa']"
+                        elemInput = self.chrome.find_element_by_xpath(xpath)
+                    old_price = round(float(elemInput.get_attribute("value")), 2)
+                    elemInput.clear()
+                    elemInput.send_keys(Keys.BACK_SPACE)
+                    elemInput.send_keys(Keys.CONTROL + "a")
+                    elemInput.send_keys(Keys.DELETE)
+                    elemInput.send_keys(value)
+                    elemInput.send_keys(str(price))
+                    xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
+                    WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
+                    elemBtn = self.chrome.find_element_by_xpath(xpath)
+                    time_change = time.strftime("%Y-%m-%d %H:%M:%S")
+                    self.chrome.execute_script("arguments[0].click()", elemBtn)
+                    self.database.addAChange(ean, variant_name, old_price, price)
+                    self.database.addChangeRecord(ean, variant_name, time_change, price)
+                    out += "[" + str(change_count+1) + "次]"
+                    # if ean in self.record:
+                    #     self.record[ean][0] = price
+                    #     self.record[ean][1] += 1
+                    # else:
+                    #     self.record[ean] = [price, 1]
+                    printYellow("后台：" + out + "\t改价成功")
+                except:
+                    out += "[" + str(change_count) + "次]"
+                    self.exceptHandler(traceback.format_exc())
+                    printRed("后台：" + out + "\t改价失败")
+            else:
+                out += "[" + str(change_count) + "次]"
+                printRed("后台：" + out + "\t达到最大改价次数")
             self.database.finishOneChangeItem(ean, price, variant_name)
             self.chrome.back()
 

@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['..\\xls2sqlite.py'],
-             pathex=['C:\\D\\Github\\AutoMachine\\pak_installer'],
+             pathex=['D:\\Utils\\AutoMachine\\VisualStudio2013WorkPlatform\\automachine\\pak_installer'],
              binaries=[],
              datas=[],
              hiddenimports=[],

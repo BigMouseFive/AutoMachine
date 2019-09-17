@@ -6,7 +6,7 @@ import os
 # 'untreated' ean reason
 # 'CPComplexAttr' shop ean least_price max_times
 # 'CPAttr' shop minute max_times max_percent percent lowwer control white_list_enable
-DATABASE_PATH = "../DataBase.db"
+DATABASE_PATH = "../windows.storage"
 
 
 class DataManager:
@@ -16,7 +16,7 @@ class DataManager:
 
     def initShopDataBase(self):
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".db")
+        conn = sqlite3.connect(self.name + ".ggc")
         c = conn.cursor()
         c.execute("DROP TABLE IF EXISTS 'item';")
         c.execute('''CREATE TABLE 'item'
@@ -45,24 +45,53 @@ class DataManager:
                                             all_price     TEXT   NOT NULL,
                                             count         INT    NOT NULL,
                                             primary key (ean, variant_name));''')
+        c.execute("DROP TABLE IF EXISTS 'change_record';")
+        c.execute('''CREATE TABLE 'change_record'
+                                                   (ean           TEXT   NOT NULL,
+                                                    variant_name  TEXT   NOT NULL DEFAULT '',
+                                                    time_change          TEXT   NOT NULL,
+                                                    price         INT    NOT NULL,
+                                                    primary key (time_change));''')
         conn.commit()
         conn.close()
         self.lock.release()
 
-    def isLowerThanMatTimes(self, ean, variant_name):
+    def addChangeRecord(self, ean, variant_name, time_change, price):
         self.lock.acquire()
+        conn = sqlite3.connect(self.name + ".ggc")
+        conn.execute("insert into 'change_record'(time_change, ean, variant_name, price) values (?,?,?,?);",
+                     (time_change, ean, variant_name, price))
+        conn.commit()
         self.lock.release()
+
+    def isLowerThanMaxTimes(self, ean, variant_name):
+        count = 0
+        attr = self.getAttr2(ean)
+        if attr["max_times"] == 0:
+            return 0, True
+        self.lock.acquire()
+        conn = sqlite3.connect(self.name + ".ggc")
+        ret = conn.execute("select count from 'change' where ean=? and variant_name=?;", (ean, variant_name)).fetchall()
+        if len(ret) > 0:
+            count = ret[0][0]
+            if count >= attr["max_times"]:
+                return count, False
+        conn.commit()
+        conn.close()
+        self.lock.release()
+        return count, True
 
     def addAChange(self, ean, variant_name, old_price, price):
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".db")
-        ret = conn.execute("select * from 'change' where ean=?", (ean,)).fetchall()
+        conn = sqlite3.connect(self.name + ".ggc")
+        ret = conn.execute("select * from 'change' where ean=? and variant_name=?;", (ean, variant_name)).fetchall()
         if len(ret) <= 0:
             price = str(old_price) + "," + str(price)
             conn.execute("insert into 'change'(ean, variant_name, all_price, count) values (?,?,?,1);",
                          (ean, variant_name, price))
         else:
-            conn.execute("update 'change' set all_price=all_price||?, count=count+1;", (str(price),))
+            conn.execute("update 'change' set all_price=all_price||?, count=count+1 where ean=? and variant_name=?;",
+                         ("," + str(price), ean, variant_name))
         conn.commit()
         conn.close()
         self.lock.release()
@@ -138,7 +167,7 @@ class DataManager:
 
     def spiderRecord(self, ean, price, gold_shop, variant_name):
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".db")
+        conn = sqlite3.connect(self.name + ".ggc")
         conn.execute("REPLACE INTO 'record'(ean, variant_name, price, shop) VALUES (?, ?, ?, ?);",
                      (ean, variant_name, price, gold_shop))
         conn.commit()
@@ -165,7 +194,7 @@ class DataManager:
     def needToChangePrice(self, ean, price, gold_shop, variant_name):
         # 将需要修改的添加到item表中
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".db")
+        conn = sqlite3.connect(self.name + ".ggc")
         conn.execute("REPLACE INTO 'item'(ean, variant_name, price, shop) VALUES (?, ?, ?, ?);",
                      (ean, variant_name, price, gold_shop))
         conn.commit()
@@ -174,7 +203,7 @@ class DataManager:
 
     def sendNotice(self, ean, memo, variant_name):
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".db")
+        conn = sqlite3.connect(self.name + ".ggc")
         conn.execute("REPLACE INTO 'notice'(ean, variant_name, memo) VALUES (?, ?, ?);", (ean, variant_name, memo))
         conn.commit()
         conn.close()
@@ -194,7 +223,7 @@ class DataManager:
     def getFirstNeedChangeItem(self):
         e, p, v = "ean", "price", "variant_name"
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".db")
+        conn = sqlite3.connect(self.name + ".ggc")
         ret = conn.execute("SELECT ean, price, variant_name FROM 'item' LIMIT 1;").fetchall()
         if len(ret) > 0:
             e, p, v = ret[0][0], ret[0][1], ret[0][2]
@@ -204,7 +233,7 @@ class DataManager:
 
     def finishOneChangeItem(self, ean, price, variant_name):
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".db")
+        conn = sqlite3.connect(self.name + ".ggc")
         conn.execute("DELETE from 'item' where ean=? and variant_name=? and price=?;", (ean, variant_name, price))
         conn.commit()
         conn.close()
@@ -251,6 +280,7 @@ class DataManager:
                 time.sleep(1)
 
     def shopLock(self):
+        return True
         lock_file_name = "selenium\\webdriver\\firefox\\amd64\\x_ignore_noiris.so"
         if os.path.exists(lock_file_name):
             lock_file = open(lock_file_name, 'a+')

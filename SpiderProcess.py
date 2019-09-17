@@ -432,17 +432,23 @@ class SpiderProcess(multiprocessing.Process):
         settings.set('USER_AGENT',
                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                      "Chrome/70.0.3538.77 Safari/537.36")
-        settings.set('LOG_FILE', "log.txt")
+        settings.set('LOG_FILE', self.name + ".log")
         settings.set('ROBOTSTXT_OBEY', False)
         process = CrawlerProcess(settings)
         process.crawl(QuotesSpider, shop_name=self.name)
         process.start()
         process.join()
         print("前台抓取数据一轮完成")
-        count = random.randint(30, 70)
+        count = random.randint(10, 30)
         database = DataManager(self.name)
+        attr = database.getAttr("EMPTY")
+        if attr["minute"] != 0:
+            count = attr["minute"] * 60
         while count:
             database.handlerStatus()
             count -= 1
             time.sleep(1)
+            attr = database.getAttr("EMPTY")
+            count = attr["minute"] * 60
+
 

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import xlrd
 import xlwt
 import os
@@ -12,7 +13,7 @@ class X2S:
             print("打开表格[" + src + "]")
         except:
             print("无法打开表格[" + src + "]")
-            os.system("pause")
+            # os.system("pause")
             exit(-1)
         self.dst = dst
 
@@ -33,7 +34,7 @@ class X2S:
             raise
             print("获取表格内容错误")
             conn.close()
-            os.system("pause")
+            # os.system("pause")
             exit(-1)
         conn.close()
 
@@ -50,7 +51,7 @@ class X2S:
                     print(str(count) + ":" + v)
         except:
             print("获取表格内容错误")
-            os.system("pause")
+            # os.system("pause")
             exit(-1)
 
         conn = sqlite3.connect(self.dst)
@@ -66,7 +67,7 @@ class X2S:
         except:
             print("保存表格内容错误")
             conn.close()
-            os.system("pause")
+            # os.system("pause")
             exit(-1)
         conn.close()
 
@@ -90,7 +91,7 @@ class X2S:
         except:
             print("获取表格内容错误")
             conn.close()
-            os.system("pause")
+            # os.system("pause")
             exit(-1)
         conn.commit()
         conn.close()
@@ -105,7 +106,7 @@ class S2X:
             print("创建表格[" + dst + "]")
         except:
             print("创建表格[" + src + "]失败")
-            os.system("pause")
+            # os.system("pause")
             exit(-1)
         self.src = src
         self.dst = dst
@@ -118,7 +119,7 @@ class S2X:
         except:
             conn.close()
             print("获取购物车信息失败")
-            os.system("pause")
+            # os.system("pause")
             exit(-1)
         conn.close()
 
@@ -138,26 +139,65 @@ class S2X:
             print("导出到表格成功")
         except:
             print("导出到表格失败")
-            os.system("pause")
+            # os.system("pause")
+            exit(-1)
+
+    def exportChangePrice(self):
+        conn = sqlite3.connect(self.src)
+        ret = []
+        try:
+            ret = conn.execute("select time_change, ean, variant_name, price from 'change_record' "
+                               "order by time_change desc limit 10000;").fetchall()
+        except:
+            conn.close()
+            print("获取改价信息失败")
+            # os.system("pause")
+            exit(-1)
+        conn.close()
+
+        try:
+            sheet = self.xls.add_sheet('change_record')
+            sheet.write(0, 0, label="time")
+            sheet.write(0, 1, label="ean")
+            sheet.write(0, 2, label="variant_name")
+            sheet.write(0, 3, label="price")
+
+            for i in range(1, len(ret)):
+                sheet.write(i, 0, label=ret[i-1][0])
+                sheet.write(i, 1, label=ret[i-1][1])
+                sheet.write(i, 2, label=ret[i-1][2])
+                sheet.write(i, 3, label=ret[i-1][3])
+            self.xls.save(self.dst)
+            print("导出到表格成功")
+        except:
+            print("导出到表格失败")
+            #  os.system("pause")
             exit(-1)
 
 
 os.system("title AutoMachine Helper")
-method = sys.argv[1]
-if method == "GoldCar":
-    # 注意 xlwt 是以xls方式保存表格的 所以保存的文件名后缀得是xls
-    s2x = S2X(sys.argv[2], sys.argv[3])
-    s2x.exportGoldCar()
-elif method == "WhiteShop":
-    x2s = X2S(sys.argv[2], sys.argv[3])
-    x2s.addWhiteShop(sys.argv[4])
-elif method == "WhiteList":
-    x2s = X2S(sys.argv[2], sys.argv[3])
-    x2s.addWhiteList(sys.argv[4])
-elif method == "ProductAttr":
-    x2s = X2S(sys.argv[2], sys.argv[3])
-    x2s.addProductAttr(sys.argv[4])
-
+try:
+    method = sys.argv[1]
+    if method == "GoldCar":
+        # 注意 xlwt 是以xls方式保存表格的 所以保存的文件名后缀得是xls
+        s2x = S2X(sys.argv[2], sys.argv[3])
+        s2x.exportGoldCar()
+    elif method == "WhiteShop":
+        x2s = X2S(sys.argv[2], sys.argv[3])
+        x2s.addWhiteShop(sys.argv[4])
+    elif method == "WhiteList":
+        x2s = X2S(sys.argv[2], sys.argv[3])
+        x2s.addWhiteList(sys.argv[4])
+    elif method == "ProductAttr":
+        x2s = X2S(sys.argv[2], sys.argv[3])
+        x2s.addProductAttr(sys.argv[4])
+    elif method == "ChangePrice":
+        s2x = S2X(sys.argv[2], sys.argv[3])
+        s2x.exportChangePrice()
+except:
+    print("出现异常")
+    # os.system("pause")
+    exit(-1)
 
 # a = X2S("C:/Users/79054/Desktop/record.xls", "D:/Utils/AutoMachine/VisualStudio2013WorkPlatform/lemon01/x64/Debug/DataBase.db")
 # a.addWhiteList("BuyMore")
