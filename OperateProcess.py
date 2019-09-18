@@ -5,7 +5,6 @@ import json
 import traceback
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from DataManager import DataManager
@@ -309,10 +308,6 @@ class OperateProcess(multiprocessing.Process):
                     xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_sa']"
                     elemInput = self.chrome.find_element_by_xpath(xpath)
                 elemInput.clear()
-                elemInput.sendKeys(Keys.BACK_SPACE)
-                elemInput.sendKeys(Keys.CONTROL + "a")
-                elemInput.sendKeys(Keys.DELETE)
-                elemInput.sendKeys(value)
                 elemInput.send_keys(str(price))
                 xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
                 WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
