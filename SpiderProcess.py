@@ -54,7 +54,7 @@ from DataManager import DataManager
 
 
 class QuotesSpider(scrapy.Spider):
-    name = "goldcar"
+    name = "noon_car"
 
     def __init__(self, shop_name=None, *args, **kwargs):
         super(QuotesSpider, self).__init__(*args, **kwargs)
@@ -66,114 +66,82 @@ class QuotesSpider(scrapy.Spider):
         # print(out)
 
     def parse(self, response):
-        handler = "parseHandler_b"
-        add_headers = {
-            "x-locale": "en-sa",
-        }
-        for quote in response.xpath(".//div[@class='jsx-2127843686 productContainer']"):
+        for asin in response.xpath(".//div[@class='sg-col-20-of-24 s-result-item "
+                                   "sg-col-0-of-12 sg-col-28-of-32 sg-col-16-of-20 "
+                                   "sg-col sg-col-32-of-36 sg-col-12-of-16 sg-col-24-of-28']/@data-asin").extract():
             self.database.handlerStatus()
             time.sleep(random.randint(0, 1))
-            uri = ""
-            if handler == "parseHandler_a":
-                uri = "https://www.noon.com" + str(quote.xpath(".//a[@class='jsx-4244116889 product']/@href").extract()[0])
-            elif handler == "parseHandler_b":
-                uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[@class='jsx-4244116889 "
-                                                                                   "product']/@href").extract()[0])
-            if uri is not None:
-                uri = uri.split('?')[0]
-                yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
+            url = "https://www.amazon.ae/dp/" + asin
+            if url is not None:
+                url = url.split('?')[0]
+                yield response.follow(url, callback=self.parseHandler1, meta={"asin": asin})
 
         # 获取下一页的url, （DEL::如果没有就从头开始）
-        value = str(response.xpath(
-            ".//div[@class='jsx-2341487112 paginationWrapper']//a[@class='nextLink']/@aria-disabled").extract()[0])
-        if value is not None and value == "false":
+        next = response.xpath(".//li[@class='a-last']/a/@href").extract()
+        if next and len(next) > 0 and len(next[0]) > 0:
             self.page_index = self.page_index + 1
-            next_page = self.start_urls[0] + "?page=" + str(self.page_index)
+            next_page = "https://www.amazon.ae/" + next[0]
             yield response.follow(next_page, callback=self.parse)
 
-    def parseHandler_a(self, response):
-        infos, gold_shop = self.getAllPirce_a(response)  # 获取所有的价格并以此形式返回{shop_name:[price, rating, fullfilled], ...}
-        if gold_shop == "$Rt%6y":
-            gold_shop = self.shop_name
-        ean = response._get_url().split("/")[-2]  # EAN
-        self.solutionNoon(ean, infos, gold_shop)
-
-    def parseHandler_b(self, response):
-        if not response.text:
-            print("parseHandler_b: empty response")
-            return
+    def parseHandler1(self, response):
         try:
-            res_json = json.loads(response.text)
-            ean = res_json["product"]["sku"]
-            variants = res_json["product"]["variants"]
-            for variant in variants:
-                try:
-                    offers = variant["offers"]
-                    variant_name = variant["variant"]
-                    if len(offers) == 0:
-                        continue
-                    infos, gold_shop = self.getAllPirce_b(offers)
-                    if self.shop_name in infos:
-                        self.solutionNoon(ean, infos, gold_shop, variant_name)
-                except ValueError:
-                    print("parseHandler_b: handler variant error: " + str(variant))
-        except ValueError:
-            print("parseHandler_b: handler json error")
+            gold_shop = response.xpath(".//a[@id='sellerProfileTriggerId']//text()").extract()[0].lower()
+        except IndexError:
             return
+        asin = response.meta["asin"]
+        url = "https://www.amazon.ae/gp/offer-listing/" + asin
+        yield response.follow(url, callback=self.parseHandler2, meta={"asin": asin, "gold_shop": gold_shop, "infos": {}})
 
-    def getAllPirce_a(self, response):
-        infos = {}
-        gold_shop = "$Rt%6y"
-        rows = response.xpath(".//ul[@class='jsx-1312782570 offersList']/li")
+    def parseHandler2(self, response):   # 包含了getAllPrice
+        rows = response.xpath(".//div[@class='a-row a-spacing-mini olpOffer']")
         for row in rows:
-            price = row.xpath(".//span[@class='value']//text()").extract()[0]
-            price = round(float(price), 2)
-            shop_name = row.xpath(".//p[@class='jsx-1312782570']//text()").extract()
-            shop_name = str(shop_name[2]).lower()
-            if gold_shop == "$Rt%6y":
-                gold_shop = shop_name
-            ret = row.xpath(".//div[@class='jsx-3304762718 container']")
-            is_fbn = False
-            if len(ret) > 0:
-                is_fbn = True
-            rating = 100
-            infos[shop_name] = [price, rating, is_fbn]
-        if len(infos) == 0:
-            price = response.xpath(
-                ".//div[@class='jsx-2122863564 pdpPrice']//span[@class='value']//text()").extract()[0]
-            price = round(float(price), 2)
-            is_fbn = False
-            ret = response.xpath(
-                ".//div[@class='jsx-2490358733 shippingEstimatorContainer']//div[@class='jsx-3304762718 container']")
-            if len(ret) > 0:
-                is_fbn = True
-            rating = 100
-            infos[self.shop_name] = [price, rating, is_fbn]
-        return infos, gold_shop
+            price = row.xpath(".//span[@class='a-size-large a-color-price olpOfferPrice a-text-bold']//text()").extract()[0]
+            price = round(float(price.split("AED")[-1].strip()), 2)
+            is_fba = False
+            price_ship = 0
+            ret = row.xpath(".//span[@class='supersaver']")
+            if ret and len(ret) > 0:
+                is_fba = True
+            ret = row.xpath(".//p[@class='olpShippingInfo']//span[@class='olpShippingPrice']//text()")
+            if ret and len(ret) > 0:
+                price_ship = ret.extract()[0]
+                price_ship = round(float(price_ship.split("AED")[-1].strip()), 2)
+            shop_name = row.xpath(".//h3[@class='a-spacing-none olpSellerName']//a/text()").extract()[0]
+            shop_name = shop_name.lower()
+            rating = row.xpath(".//p[@class='a-spacing-small']//a/b/text()")
+            if rating and len(rating) > 0:
+                rating = int(rating.extract()[0].split("%")[0].strip())
+            else:
+                rating = 0
+            response.meta["infos"][shop_name] = [round(price + price_ship, 2), rating, is_fba]
 
-    def getAllPirce_b(self, offers):
-        infos = {}
-        gold_shop = offers[0]["store_name"].lower()
-        for offer in offers:
-            is_fbn = offer["is_fbn"] == 1
-            rating = offer["seller_score"]
-            price = offer["price"]
-            if offer["sale_price"]:
-                price = offer["sale_price"]
-            infos[offer["store_name"].lower()] = [price, rating, is_fbn]
-        return infos, gold_shop
+        next = response.xpath(".//li[@class='a-last']/a/@href").extract()
+        if next and len(next) > 0 and len(next[0]) > 0:
+            next_page = "https://www.amazon.ae/" + next[0]
+            yield response.follow(next_page, callback=self.parseHandler2, meta={"infos": response.meta["infos"],
+                                                                              "asin": response.meta["asin"],
+                                                                              "gold_shop": response.meta["gold_shop"]})
+        else:
+            self.solutionNoon(response.meta["asin"], response.meta["infos"], response.meta["gold_shop"])
 
-    def solutionNoon(self, ean, infos, gold_shop, variant_name=""):
-        if not self.database.isInWhiteList(ean, variant_name):
-            out = "前台：不在白名单 " + time.strftime("%Y-%m-%d %H:%M:%S") + "   " + ean + "[" + variant_name + "]\t本店铺[" + str(infos[self.shop_name][0]) + "]\t" + \
-              "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]"
+    def solutionNoon(self, asin, infos, gold_shop, variant_name=""):
+        if infos[gold_shop][2]:
+            print("==================" + asin + ":" + gold_shop + "==================")
+
+        for v in infos:
+            print(v + ":" + str(infos[v][0]) + "," + str(infos[v][1]) + "," + str(infos[v][2]))
+
+        if not self.database.isInWhiteList(asin, variant_name):
+            out = "前台：不在白名单 " + time.strftime("%Y-%m-%d %H:%M:%S") + "   " + asin + "[" + variant_name + "]\t本店铺[" + str(
+                infos[self.shop_name][0]) + "]\t" + \
+                  "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]"
             print(out)
             return
-
-        attr = self.database.getAttr(ean)
-        out = time.strftime("%Y-%m-%d %H:%M:%S") + "   " + ean + "[" + variant_name + "]\t本店铺[" + str(infos[self.shop_name][0]) + "]\t" + \
+        attr = self.database.getAttr(asin)
+        out = time.strftime("%Y-%m-%d %H:%M:%S") + "   " + asin + "[" + variant_name + "]\t本店铺[" + str(
+            infos[self.shop_name][0]) + "]\t" + \
               "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]"
-        self.database.spiderRecord(ean, infos[gold_shop][0], gold_shop, variant_name)
+        self.database.spiderRecord(asin, infos[gold_shop][0], gold_shop, variant_name)
         if gold_shop in attr["my_shop"]:  # 黄金购物车是自家店铺
             out = "情况A " + out + "\t不修改"
         else:
@@ -187,14 +155,14 @@ class QuotesSpider(scrapy.Spider):
                         if price < attr["self_least_price"]:
                             out = "情况C " + out + "\t不修改"
                         else:
-                            self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                            self.database.needToChangePrice(asin, price, gold_shop, variant_name)
                             out = "情况C " + out + "\t差价比[" + str(round(diff1 * 100, 2)) + "%]\t改价为[" + str(price) + "]"
                 else:
                     price = round(infos[self.shop_name][0] - attr["lowwer"], 2)
                     if price < max(infos[gold_shop][0], attr["self_least_price"]):
                         out = "情况D " + out + "\t不修改"
                     else:
-                        self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                        self.database.needToChangePrice(asin, price, gold_shop, variant_name)
                         out = "情况D " + out + "\t改价为[" + str(price) + "]"
 
             else:
@@ -211,7 +179,7 @@ class QuotesSpider(scrapy.Spider):
                     if price < attr["self_least_price"]:
                         out = "情况F " + out + "\t最低价[" + str(least_price) + "]\t" + "不修改"
                     else:
-                        self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                        self.database.needToChangePrice(asin, price, gold_shop, variant_name)
                         out = "情况F " + out + "\t最低价[" + str(least_price) + "]\t" + "差价比[" + \
                               str(round(diff2 * 100, 2)) + "%]\t改价为[" + str(price) + "]"
         out = "前台：" + out
@@ -450,5 +418,3 @@ class SpiderProcess(multiprocessing.Process):
             time.sleep(1)
             attr = database.getAttr("EMPTY")
             count = attr["minute"] * 60
-
-

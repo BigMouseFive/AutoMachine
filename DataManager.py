@@ -6,7 +6,7 @@ import os
 # 'untreated' ean reason
 # 'CPComplexAttr' shop ean least_price max_times
 # 'CPAttr' shop minute max_times max_percent percent lowwer control white_list_enable
-DATABASE_PATH = "../windows.storage"
+DATABASE_PATH = "./DataBase.db"
 
 
 class DataManager:
@@ -153,7 +153,7 @@ class DataManager:
 
     def getScrapyUrl(self):
         self.lock.acquire()
-        url = ["https://www.noon.com/saudi-en/"]
+        url = [""]  # A2WNDNWSECVX5P
         conn = sqlite3.connect(DATABASE_PATH)
         try:
             ret = conn.execute("select shop_id from 'shopInfo' where shop=?;", (self.name,)).fetchall()
@@ -163,6 +163,7 @@ class DataManager:
             url = []
         conn.close()
         self.lock.release()
+        url = ["https://www.amazon.ae/s?me=" + url[0] + "&marketplaceID=A2VIGQ35RCS4UG"]
         return url
 
     def spiderRecord(self, ean, price, gold_shop, variant_name):
