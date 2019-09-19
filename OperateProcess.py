@@ -5,7 +5,6 @@ import json
 import traceback
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from DataManager import DataManager
@@ -323,6 +322,7 @@ class OperateProcess(multiprocessing.Process):
                     xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='sale_price_sa']"
                     WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                     elemInput = self.chrome.find_element_by_xpath(xpath)
+<<<<<<< HEAD
                     value = elemInput.get_attribute("value")
                     if value is None or value == "value" or len(value) == 0:
                         xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_sa']"
@@ -355,6 +355,25 @@ class OperateProcess(multiprocessing.Process):
             else:
                 out += "[" + str(change_count) + "次]"
                 printRed("后台：" + out + "\t达到最大改价次数")
+=======
+                elemInput.clear()
+                elemInput.send_keys(str(price))
+                xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
+                WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
+                elemBtn = self.chrome.find_element_by_xpath(xpath)
+                self.chrome.execute_script("arguments[0].click()", elemBtn)
+                if ean in self.record:
+                    self.record[ean][0] = price
+                    self.record[ean][1] += 1
+                else:
+                    self.record[ean] = [price, 1]
+                out += "[第" + str(self.record[ean][1]) + "次]"
+                printYellow("后台：" + out + "\t改价成功")
+                # time.sleep(10)
+            except:
+                self.exceptHandler(traceback.format_exc())
+                printRed("后台：" + out + "\t改价失败")
+>>>>>>> 9b5773673f82ea06b5cb54475d71f40bd0d6b278
             self.database.finishOneChangeItem(ean, price, variant_name)
             self.chrome.back()
 
