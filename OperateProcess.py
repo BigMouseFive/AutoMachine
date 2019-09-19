@@ -39,7 +39,7 @@ class OperateProcess(multiprocessing.Process):
         printYellow("启动后台改价任务")
         while 1:
             option = webdriver.ChromeOptions()
-            option.add_argument("headless")
+            # option.add_argument("headless")
             option.add_argument('ignore-certificate-errors')
             option.add_argument('log-level=3')
             option.add_argument('lang=zh_CN.UTF-8')
@@ -246,14 +246,16 @@ class OperateProcess(multiprocessing.Process):
                 debug_out = ""
                 while 1:
                     time.sleep(1.5)
-                    e1 = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a")
+                    e1 = self.chrome.find_elements_by_xpath(
+                        ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
                     e2 = self.chrome.find_elements_by_xpath(
-                            ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
-                            "//div[@class='jsx-3793681198 text']")
-                    if not(len(e1) == 1 or len(e2) == 1):
+                        ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
+                        "//div[@class='jsx-3793681198 text']")
+                    if not (len(e1) == 1 or len(e2) == 1):
                         continue
                     debug_out += "1"
-                    elemProducts = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
+                    elemProducts = self.chrome.find_elements_by_xpath(
+                        ".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
                     if len(elemProducts) >= 1:
                         debug_out += "2"
                         elemProduct = self.chrome.find_elements_by_xpath(
@@ -266,15 +268,17 @@ class OperateProcess(multiprocessing.Process):
                             break
                         if len(elemProducts) == 1:
                             debug_out += "4"
-                            elemProduct = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a")
-                            product_url = str(elemProduct[0].get_attribute("href"))
+                            elemProduct = self.chrome.find_elements_by_xpath(
+                                ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
+                            product_url = str(elemProduct[0].text)
                             if product_url != url_bak:
                                 debug_out += "5"
                                 url_bak = product_url
                                 break
                         else:
                             debug_out += "6"
-                            e1 = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a")
+                            e1 = self.chrome.find_elements_by_xpath(
+                                ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
                             if not len(e1) == 1:
                                 debug_out += "$"
                                 continue
@@ -289,12 +293,12 @@ class OperateProcess(multiprocessing.Process):
                                 if len(key) == 1:
                                     value = key[0].find_elements_by_xpath("./following-sibling::div[1]")
                                     debug_out += "9" + value[0].text
-                                    if len(value[0].text) > 0 and len(value) == 1 and value[0].text[0] == variant_name[0] and value[0].text in variant_name:
-                                        elemProduct = elemProduct.find_elements_by_xpath("./td[1]//a")
+                                    if len(value[0].text) > 0 and len(value) == 1 and value[0].text[0] == variant_name[                                        0] and value[0].text in variant_name:
+                                        elemProduct = elemProduct.find_elements_by_xpath("./td[1]//span")
                                         debug_out += "0"
                                         if len(elemProduct) == 1:
                                             debug_out += "|"
-                                            product_url = str(elemProduct[0].get_attribute("href"))
+                                            product_url = str(elemProduct[0].text)
                                             if product_url != url_bak:
                                                 debug_out += "!"
                                                 url_bak = product_url
@@ -336,7 +340,12 @@ class OperateProcess(multiprocessing.Process):
                     self.chrome.execute_script("arguments[0].click()", elemBtn)
                     self.database.addAChange(ean, variant_name, old_price, price)
                     self.database.addChangeRecord(ean, variant_name, time_change, price)
-                    out += "[" + str(change_count+1) + "次]"
+                    out += "[" + str(change_count + 1) + "次]"
+                    # if ean in self.record:
+                    #     self.record[ean][0] = price
+                    #     self.record[ean][1] += 1
+                    # else:
+                    #     self.record[ean] = [price, 1]
                     printYellow("后台：" + out + "\t改价成功")
                 except:
                     out += "[" + str(change_count) + "次]"

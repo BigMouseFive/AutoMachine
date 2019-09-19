@@ -6,3 +6,4 @@ chrome_*
 *.log
 pak_installer/dist
 pak_installer/build
+*.spec
