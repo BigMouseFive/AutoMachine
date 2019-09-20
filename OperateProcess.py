@@ -39,6 +39,8 @@ class OperateProcess(multiprocessing.Process):
         printYellow("启动后台改价任务")
         while 1:
             option = webdriver.ChromeOptions()
+            option.add_argument('--no-sandbox')
+            option.add_argument('--disable-dev-shm-usage')
             # option.add_argument("headless")
             option.add_argument('ignore-certificate-errors')
             option.add_argument('log-level=3')
