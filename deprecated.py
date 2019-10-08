@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
 # def skr(name):
 #     if __name__ == '__main__':
-#         os.system("title AutoMacine " + name)
+#         # os.system("title AutoMacine " + name)
 #         freeze_support()
 #         os.chdir(os.path.split(os.path.realpath(__file__))[0])
 #         pre_test(name)
@@ -53,4 +53,4 @@ if __name__ == '__main__':
 #
 #
 # skr("BuyMore")
-#
+

@@ -67,9 +67,13 @@ class QuotesSpider(scrapy.Spider):
 
     def parse(self, response):
         handler = "parseHandler_b"
-        add_headers = {
-            "x-locale": "en-sa",
-        }
+
+        shop_type = self.database.getShopType()
+        add_headers = {}
+        if shop_type == "ksa":
+            add_headers = {"x-locale": "en-sa"}
+        elif shop_type == "uae":
+            add_headers = {"x-locale": "en-ae"}
         for quote in response.xpath(".//div[@class='jsx-2127843686 productContainer']"):
             self.database.handlerStatus()
             time.sleep(random.randint(0, 1))
@@ -444,9 +448,10 @@ class SpiderProcess(multiprocessing.Process):
         attr = database.getAttr("EMPTY")
         if attr["minute"] != 0:
             count = attr["minute"] * 60
-        while count:
+        minute = 0
+        while minute <= count:
             database.handlerStatus()
-            count -= 1
+            minute += 1
             time.sleep(1)
             attr = database.getAttr("EMPTY")
             count = attr["minute"] * 60

@@ -67,15 +67,13 @@ class DataManager:
     def isLowerThanMaxTimes(self, ean, variant_name):
         count = 0
         attr = self.getAttr2(ean)
-        if attr["max_times"] == 0:
-            return 0, True
         self.lock.acquire()
         conn = sqlite3.connect(self.name + ".ggc")
         ret = conn.execute("select count from 'change' where ean=? and variant_name=?;", (ean, variant_name)).fetchall()
         if len(ret) > 0:
             count = ret[0][0]
-            if count >= attr["max_times"]:
-                return count, False
+        if count >= attr["max_times"]:
+            return count, False
         conn.commit()
         conn.close()
         self.lock.release()
@@ -121,14 +119,14 @@ class DataManager:
                 attr["self_least_price"] = ret[0][0]
         except:
             attr["self_least_price"] = 0
-
+            print(ean + ": " + str(attr["self_least_price"]))
         conn.close()
         self.lock.release()
         return attr
 
     def getAttr2(self, ean):
         self.lock.acquire()
-        attr = {"max_times": 0, "max_percent": 0}
+        attr = {"max_times": 999999, "max_percent": 0}
         conn = sqlite3.connect(DATABASE_PATH)
         # # 通用改价参数
         # try:
@@ -145,15 +143,21 @@ class DataManager:
             if len(ret) > 0:
                 attr["max_times"] = ret[0][0]
         except:
-            attr["max_times"] = 0
+            attr["max_times"] = 999999
 
         conn.close()
         self.lock.release()
         return attr
 
     def getScrapyUrl(self):
+        url = []
+        shop_type = self.getShopType()
+        if shop_type == "ksa":
+            url = ["https://www.noon.com/saudi-en/"]
+        elif shop_type == "uae":
+            url = ["https://www.noon.com/uae-en/"]
+
         self.lock.acquire()
-        url = ["https://www.noon.com/saudi-en/"]
         conn = sqlite3.connect(DATABASE_PATH)
         try:
             ret = conn.execute("select shop_id from 'shopInfo' where shop=?;", (self.name,)).fetchall()
@@ -280,7 +284,6 @@ class DataManager:
                 time.sleep(1)
 
     def shopLock(self):
-        return True
         lock_file_name = "selenium\\webdriver\\firefox\\amd64\\x_ignore_noiris.so"
         if os.path.exists(lock_file_name):
             lock_file = open(lock_file_name, 'a+')
@@ -317,5 +320,19 @@ class DataManager:
                 lock_file.close()
                 return False
 
-
+    def getShopType(self):
+        self.lock.acquire()
+        status = "ksa"
+        conn = sqlite3.connect(DATABASE_PATH)
+        try:
+            ret = conn.execute("select type from 'shopInfo' where shop=?;", (self.name,)).fetchall()
+            if len(ret) > 0:
+                if ret[0][0] == 1:
+                    status = "ksa"
+                elif ret[0][0] == 0:
+                    status = "uae"
+        except:
+            status = "ksa"
+        self.lock.release()
+        return status
 

@@ -5,6 +5,7 @@ import json
 import traceback
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from DataManager import DataManager
@@ -41,7 +42,7 @@ class OperateProcess(multiprocessing.Process):
             option = webdriver.ChromeOptions()
             option.add_argument('--no-sandbox')
             option.add_argument('--disable-dev-shm-usage')
-            # option.add_argument("headless")
+            option.add_argument("headless")
             option.add_argument('ignore-certificate-errors')
             option.add_argument('log-level=3')
             option.add_argument('lang=zh_CN.UTF-8')
@@ -81,7 +82,14 @@ class OperateProcess(multiprocessing.Process):
         except:
             printYellow("后台：方式1登录失败，尝试方式2")
         i = 0
-        while self.chrome.current_url != "https://core.noon.partners/en-sa/":
+        compare = ""
+        shop_type = self.database.getShopType()
+        if shop_type == "ksa":
+            compare = "https://core.noon.partners/en-sa/"
+        elif shop_type == "uae":
+            compare = "https://core.noon.partners/en-ae/"
+
+        while self.chrome.current_url != compare:
             time.sleep(1)
             i = i + 1
             if i > 150:
@@ -107,7 +115,12 @@ class OperateProcess(multiprocessing.Process):
             if handler != self.loginHandler:
                 self.unknownHandler = handler
                 break
-        js = 'window.open("https://catalog.noon.partners/en-sa/catalog")'
+        js = ""
+        shop_type = self.database.getShopType()
+        if shop_type == "ksa":
+            js = 'window.open("https://catalog.noon.partners/en-sa/catalog")'
+        elif shop_type == "uae":
+            js = 'window.open("https://catalog.noon.partners/en-ae/catalog")'
         self.chrome.execute_script(js)
         handlers = self.chrome.window_handles
         for handler in handlers:
@@ -228,6 +241,11 @@ class OperateProcess(multiprocessing.Process):
             self.database.finishOneChangeItem(ean, price, variant_name)
 
     def OperateProductSelenium(self):
+        shop_type = self.database.getShopType()
+        if shop_type == "ksa":
+            shop_type = "sa"
+        elif shop_type == "uae":
+            shop_type = "ae"
         global product_url, elemProduct, debug_out
         printYellow("后台：开始改价")
         url_bak = ""
@@ -322,18 +340,21 @@ class OperateProcess(multiprocessing.Process):
             # self.chrome.switch_to.window(self.loginHandler)
             # js = 'window.location.replace("' + product_url + '")'
             # self.chrome.execute_script(js)
+
             change_count, flag = self.database.isLowerThanMaxTimes(ean, variant_name)
             if flag:
                 try:
-                    xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='sale_price_sa']"
+                    xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='sale_price_" + shop_type + "']"
                     WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                     elemInput = self.chrome.find_element_by_xpath(xpath)
                     value = elemInput.get_attribute("value")
                     if value is None or value == "value" or len(value) == 0:
-                        xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_sa']"
+                        xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_" + shop_type + "']"
                         elemInput = self.chrome.find_element_by_xpath(xpath)
                     old_price = round(float(elemInput.get_attribute("value")), 2)
                     elemInput.clear()
+                    elemInput.send_keys(Keys.CONTROL, "a")
+                    elemInput.send_keys(Keys.DELETE)
                     elemInput.send_keys(str(price))
                     xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
                     WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
@@ -343,11 +364,6 @@ class OperateProcess(multiprocessing.Process):
                     self.database.addAChange(ean, variant_name, old_price, price)
                     self.database.addChangeRecord(ean, variant_name, time_change, price)
                     out += "[" + str(change_count + 1) + "次]"
-                    # if ean in self.record:
-                    #     self.record[ean][0] = price
-                    #     self.record[ean][1] += 1
-                    # else:
-                    #     self.record[ean] = [price, 1]
                     printYellow("后台：" + out + "\t改价成功")
                 except:
                     out += "[" + str(change_count) + "次]"
