@@ -153,20 +153,9 @@ class DataManager:
         url = []
         shop_type = self.getShopType()
         if shop_type == "ksa":
-            url = ["https://www.noon.com/saudi-en/"]
+            url = ["https://saudi.souq.com/sa-en/" + self.name.lower() + "/p/"]
         elif shop_type == "uae":
-            url = ["https://www.noon.com/uae-en/"]
-
-        self.lock.acquire()
-        conn = sqlite3.connect(DATABASE_PATH)
-        try:
-            ret = conn.execute("select shop_id from 'shopInfo' where shop=?;", (self.name,)).fetchall()
-            if len(ret) > 0:
-                url[0] = url[0] + ret[0][0]
-        except:
-            url = []
-        conn.close()
-        self.lock.release()
+            url = ["https://saudi.souq.com/sa-en/" + self.name.lower() + "/p/"]
         return url
 
     def spiderRecord(self, ean, price, gold_shop, variant_name):

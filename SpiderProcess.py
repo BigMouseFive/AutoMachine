@@ -66,36 +66,27 @@ class QuotesSpider(scrapy.Spider):
         # print(out)
 
     def parse(self, response):
-        handler = "parseHandler_b"
-
-        shop_type = self.database.getShopType()
-        add_headers = {}
-        if shop_type == "ksa":
-            add_headers = {"x-locale": "en-sa"}
-        elif shop_type == "uae":
-            add_headers = {"x-locale": "en-ae"}
         for quote in response.xpath(".//div[@class='jsx-2127843686 productContainer']"):
             self.database.handlerStatus()
             time.sleep(random.randint(0, 1))
-            uri = ""
-            if handler == "parseHandler_a":
-                uri = "https://www.noon.com" + str(quote.xpath(".//a[@class='jsx-4244116889 product']/@href").extract()[0])
-            elif handler == "parseHandler_b":
-                uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[@class='jsx-4244116889 "
-                                                                                   "product']/@href").extract()[0])
+            fbs = quote.xpath(".//div[@class='flag flag-fbs']")
+            if len(fbs) > 0:
+                continue
+            data_id = quote.xpath(".//a[@class='img-link quickViewAction sPrimaryLink']/@data-id").extract()[0] + "/u/"
+            data_img = str(quote.xpath(".//a[@class='img-link quickViewAction sPrimaryLink']/@data-img").extract()[0]). \
+                           split("item_L_")[-1].split("_")[0] + "/i/?ctype=dsrch"
+            uri = str(quote.xpath(".//a[@class='img-link quickViewAction sPrimaryLink']/@href").extract()[0]). \
+                replace(data_id, data_img)
             if uri is not None:
-                uri = uri.split('?')[0]
-                yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
+                yield response.follow(uri, callback=self.parseHandler)
 
-        # 获取下一页的url, （DEL::如果没有就从头开始）
-        value = str(response.xpath(
-            ".//div[@class='jsx-2341487112 paginationWrapper']//a[@class='nextLink']/@aria-disabled").extract()[0])
-        if value is not None and value == "false":
-            self.page_index = self.page_index + 1
-            next_page = self.start_urls[0] + "?page=" + str(self.page_index)
+            # 获取下一页的url, （DEL::如果没有就从头开始）
+        next_page = response.xpath(".//li[@class='pagination-next goToPage']/a/@href").extract()
+        if next_page is not None and len(next_page) > 0:
+            next_page = next_page[0].replace("page=", "section=2&page=")
             yield response.follow(next_page, callback=self.parse)
 
-    def parseHandler_a(self, response):
+    def parseHandler(self, response):
         infos, gold_shop = self.getAllPirce_a(response)  # 获取所有的价格并以此形式返回{shop_name:[price, rating, fullfilled], ...}
         if gold_shop == "$Rt%6y":
             gold_shop = self.shop_name
