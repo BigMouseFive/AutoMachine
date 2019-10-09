@@ -1,8 +1,7 @@
 import multiprocessing
 import time
-import requests
-import json
 import traceback
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -39,6 +38,12 @@ class OperateProcess(multiprocessing.Process):
         self.database = DataManager(self.name)
         printYellow("启动后台改价任务")
         while 1:
+            chrome_dir = "../chrome_url.txt"
+            f = open(chrome_dir, "r")  # 设置文件对象
+            str = f.read()  # 将txt文件的所有内容读入到字符串str中
+            f.close()  # 将文件关闭
+            option = webdriver.ChromeOptions()
+            option.add_argument("user-data-dir=" + os.path.abspath(str))
             option = webdriver.ChromeOptions()
             option.add_argument('--no-sandbox')
             option.add_argument('--disable-dev-shm-usage')
@@ -66,39 +71,57 @@ class OperateProcess(multiprocessing.Process):
     def LoginAccount(self):
         self.database.handlerStatus()
         printYellow("后台：登录账户")
-        self.chrome.get('https://login.noon.partners/en/')
-        try:
-            account, password = self.database.getAccountAndPassword()
-            xpath = ".//div[@class='jsx-1240009043 group']"
-            WebDriverWait(self.chrome, 30, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-            elemLogin = self.chrome.find_elements_by_xpath(".//div[@class='jsx-1240009043 group']/input")
-            elemNewLoginBtn = self.chrome.find_element_by_xpath(
-                ".//button[@class='jsx-1789715842 base ripple primary uppercase fullWidth']")
-            elemLogin[0].clear()
-            elemLogin[1].clear()
-            elemLogin[0].send_keys(account)
-            elemLogin[1].send_keys(password)
-            elemNewLoginBtn.click()
-        except:
-            printYellow("后台：方式1登录失败，尝试方式2")
-        i = 0
-        compare = ""
-        shop_type = self.database.getShopType()
-        if shop_type == "ksa":
-            compare = "https://core.noon.partners/en-sa/"
-        elif shop_type == "uae":
-            compare = "https://core.noon.partners/en-ae/"
+        account, password = self.database.getAccountAndPassword()
 
-        while self.chrome.current_url != compare:
-            time.sleep(1)
-            i = i + 1
-            if i > 150:
-                raise TimeoutError
+        self.chrome.get("https://uae.souq.com/ae-en/login.php")
+        try:
+            elemNewAccount = self.chrome.find_element_by_id("email")
+            elemNewLoginBtn = self.chrome.find_element_by_id("siteLogin")
+            elemNewAccount.send_keys(account)
+            print("输入账户:" + account)
+            elemNewLoginBtn.click()
+            print("点击siteLogin")
+            try:
+                cssSelectText = "#continue"
+                WebDriverWait(self.chrome, 10, 0.5).until(EC.presence_of_element_located((By.CSS_SELECTOR, cssSelectText)))
+                print("获取到continue按钮")
+                elemContinue = self.chrome.find_element_by_id("continue")
+                elemContinue.click()
+                print("点击continue")
+                cssSelectText = "#ap_password"
+                WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.CSS_SELECTOR, cssSelectText)))
+                print("获取到password输入框")
+                elemPassword = self.chrome.find_element_by_id("ap_password")
+                elemLoginBtn = self.chrome.find_element_by_id("signInSubmit")
+                elemPassword.send_keys(Keys.CONTROL + "a")
+                elemPassword.send_keys(password)
+                print("输入密码：********")
+                elemLoginBtn.click()
+                print("点击continue")
+            except:
+                print("方式一登录失败，尝试方式二登录")
+                cssSelectText = "#password"
+                WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.CSS_SELECTOR, cssSelectText)))
+                print("获取到password输入框")
+                elemPassword = self.chrome.find_element_by_id("password")
+                elemLoginBtn = self.chrome.find_element_by_id("siteLogin")
+                elemPassword.clear()
+                elemPassword.send_keys(password)
+                print("输入密码：********")
+                elemLoginBtn.click()
+                print("点击登录")
+
+            cssSelectText = "#search_box"
+            WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.CSS_SELECTOR, cssSelectText)))
+        except:
+            if str(self.chrome.current_url).find("uae.souq.com/ae-en/account.php") < 0:
+                raise
         while 1:
             try:
-                self.NewInventory()
+                ret = self.NewInventory()
+                if ret == -1:
+                    return -1
             except:
-                # self.exceptHandler(traceback.format_exc())
                 raise
 
     def NewInventory(self):
@@ -109,24 +132,29 @@ class OperateProcess(multiprocessing.Process):
                 time.sleep(6000)
         printYellow("后台：打开改价页面")
         self.loginHandler = self.chrome.current_window_handle
-        handlers = self.chrome.window_handles
-        self.unknownHandler = ""
-        for handler in handlers:
+        unknownHandler = ""
+        for handler in self.chrome.window_handles:
             if handler != self.loginHandler:
-                self.unknownHandler = handler
+                unknownHandler = handler
                 break
-        js = ""
-        shop_type = self.database.getShopType()
-        if shop_type == "ksa":
-            js = 'window.open("https://catalog.noon.partners/en-sa/catalog")'
-        elif shop_type == "uae":
-            js = 'window.open("https://catalog.noon.partners/en-ae/catalog")'
+        readyUri = "https://sell.souq.com/fbs-inventory"
+        js = 'window.open("' + readyUri + '")'
         self.chrome.execute_script(js)
         handlers = self.chrome.window_handles
         for handler in handlers:
-            if handler != self.loginHandler and handler != self.unknownHandler:
+            if handler != self.loginHandler and handler != unknownHandler:
+                self.inventoryFbsHandler = handler
+                break
+
+        readyUri = "https://sell.souq.com/inventory/inventory-management"
+        js = 'window.open("' + readyUri + '")'
+        self.chrome.execute_script(js)
+        handlers = self.chrome.window_handles
+        for handler in handlers:
+            if handler != self.loginHandler and handler != unknownHandler and handler != self.inventoryFbsHandler:
                 self.inventoryHandler = handler
                 break
+
         while 1:
             try:
                 self.OperateProductSelenium()
@@ -135,245 +163,85 @@ class OperateProcess(multiprocessing.Process):
                 self.chrome.refresh()
                 continue
 
-    def prepareJSON(self, ret_json, partner_sku, price):
-        global is_active, json_sale_end, json_sale_start
-        json_price = ""
-        json_sale_price = ""
-        for part in ret_json["psku"]["available_psku"]:
-            if part["psku_canonical"] == partner_sku:
-                is_active = part["is_active"]
-                json_price = str(round(price, 2))
-                if "sale_price_sa" not in part and part["sale_price_sa"] is not None:
-                    json_sale_price = str(round(price, 2))
-                    json_price = str(part["price_sa"])
-                    json_sale_end = part["sale_end_sa"]
-                    json_sale_start = part["sale_start_sa"]
-        json_stock = []
-        for stock in ret_json["psku"]["stock"][0]["stock_group"]:
-            json_stock.append({
-                "id_warehouse": stock["id_warehouse"],
-                "quantity": "0",
-                "stock_gross": stock["stock_gross"],
-                "stock_transferred": stock["stock_transferred"],
-                "stock_reserved": stock["stock_reserved"],
-                "stock_net": stock["stock_net"],
-                "processing_time": str(stock["processing_time"]),
-                "stock_updated": False,
-                "country_code": stock["country_code"],
-                "max_processing_time": stock["max_processing_time"]
-            })
-        ret_json = {
-            "pskus": [{
-                "id_warranty": "0",
-                "partner_sku": ret_json["psku"]["partner_sku"],
-                "sku": ret_json["psku"]["sku"],
-                "psku_canonical": ret_json["psku"]["psku_canonical"],
-                "is_active": is_active,
-                "stocks": json_stock,
-                "price": json_price
-            }]
-        }
-        if len(json_sale_price) > 0:
-            ret_json["pskus"][0]["sale_price"] = json_sale_price
-            ret_json["pskus"][0]["sale_end"] = json_sale_end
-            ret_json["pskus"][0]["sale_start"] = json_sale_start
-
-        return json.dumps(ret_json)
-
-    def OperateProductRequests(self):
-        printYellow("后台：开始改价")
-        selenium_cookies = self.chrome.get_cookies()
-        selenium_headers = self.chrome.execute_script("return navigator.userAgent")
-        selenium_headers = {
-            'User-Agent': selenium_headers,
-            "origin": "https://catalog.noon.partners",
-            "Content-Type": "application/json",
-            "x-locale": "en-sa"
-        }
-        s = requests.session()
-        s.headers.update(selenium_headers)
-        for cookie in selenium_cookies:
-            short_cookie = {cookie["name"]: cookie["value"]}
-            requests.utils.add_dict_to_cookiejar(s.cookies, short_cookie)
-        s.verify = "./noon.cer"
-        while True:
-            time.sleep(1)
-            ean, price, variant_name = self.database.getFirstNeedChangeItem()
-            if ean == "ean":
-                continue
-            out = "后台：" + time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + " " + str(round(price, 2))
-            url = "https://catalog.noon.partners/_svc/clapi-v1/catalog/items?limits=20&page=1&search=" + ean
-            r = s.get(url)
-            if r.status_code == 200:
-                ret_json = json.loads(r.text)
-                if ret_json is not None and "items" in ret_json:
-                    if len(ret_json["items"]) == 1 and "partner_sku" in ret_json["items"][0]:
-                        partner_sku = ret_json["items"][0]["partner_sku"]
-                        partner_sku = partner_sku.replace('.', '').replace('-', '')
-                        if len(partner_sku) > 0:
-                            url = "https://catalog.noon.partners/_svc/clapi-v1/catalog/item/details?psku_canonical=" + partner_sku
-                            r = s.get(url)
-                            if r.status_code == 200:
-                                ret_json = json.loads(r.text)
-                                try:
-                                    ret_json = self.prepareJSON(ret_json, partner_sku, price)
-                                    url = "https://catalog.noon.partners/_svc/clapi-v1/psku"
-                                    r = s.post(url, data=ret_json, headers={
-                                        "Referer": "https://catalog.noon.partners/en-sa/catalog/" + partner_sku})
-                                    if r.status_code == 200:
-                                        printYellow(out + "\t改价成功")
-                                    else:
-                                        printRed(out + "\t改价失败\t[6]")
-                                except:
-                                    printRed(out + "\t改价失败\t[5]")
-                                    raise
-                            else:
-                                printRed(out + "\t改价失败\t[4]")
-                        else:
-                            printRed(out + "\t改价失败\t[3]")
-                    else:
-                        printRed(out + "\t改价失败\t[2]")
-                else:
-                    printRed(out + "\t改价失败\t[1]")
-            else:
-                printRed(out + "\t改价失败\t[0]")
-
-            self.database.finishOneChangeItem(ean, price, variant_name)
-
     def OperateProductSelenium(self):
-        shop_type = self.database.getShopType()
-        if shop_type == "ksa":
-            shop_type = "sa"
-        elif shop_type == "uae":
-            shop_type = "ae"
-        global product_url, elemProduct, debug_out
         printYellow("后台：开始改价")
-        url_bak = ""
         while True:
             self.database.handlerStatus()
             time.sleep(1)
-            ean, price, variant_name = self.database.getFirstNeedChangeItem()
+            ean, price, variant_name, is_fbs = self.database.getFirstNeedChangeItem()
             if ean == "ean" and price == "price":
                 continue
             out = time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + "[" + variant_name + "]\t" + str(round(price, 2))
-            self.chrome.switch_to.window(self.inventoryHandler)
-            try:
-                xpath = './/div[@class="jsx-3807287210 searchWrapper"]'
-                WebDriverWait(self.chrome, 120, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                elemSearch = self.chrome.find_element_by_xpath('.//div[@class="jsx-3807287210 searchWrapper"]//input')
-                elemSearch.clear()
-                elemSearch.send_keys(ean)
-                debug_out = ""
-                while 1:
-                    time.sleep(1.5)
-                    e1 = self.chrome.find_elements_by_xpath(
-                        ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
-                    e2 = self.chrome.find_elements_by_xpath(
-                        ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
-                        "//div[@class='jsx-3793681198 text']")
-                    if not (len(e1) == 1 or len(e2) == 1):
-                        continue
-                    debug_out += "1"
-                    elemProducts = self.chrome.find_elements_by_xpath(
-                        ".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
-                    if len(elemProducts) >= 1:
-                        debug_out += "2"
-                        elemProduct = self.chrome.find_elements_by_xpath(
-                            ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
-                            "//div[@class='jsx-3793681198 text']")
-                        if len(elemProduct) == 1:
-                            debug_out += "3"
-                            product_url = ""
-                            url_bak = ""
-                            break
-                        if len(elemProducts) == 1:
-                            debug_out += "4"
-                            elemProduct = self.chrome.find_elements_by_xpath(
-                                ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
-                            product_url = str(elemProduct[0].text)
-                            if product_url != url_bak:
-                                debug_out += "5"
-                                url_bak = product_url
-                                break
-                        else:
-                            debug_out += "6"
-                            e1 = self.chrome.find_elements_by_xpath(
-                                ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
-                            if not len(e1) == 1:
-                                debug_out += "$"
-                                continue
-                            if variant_name == "":
-                                debug_out += "7"
-                                product_url = ""
-                                url_bak = ""
-                                break
-                            for elemProduct in elemProducts:
-                                debug_out += "8"
-                                key = elemProduct.find_elements_by_xpath(".//div[text()='Variant']")
-                                if len(key) == 1:
-                                    value = key[0].find_elements_by_xpath("./following-sibling::div[1]")
-                                    debug_out += "9" + value[0].text
-                                    if len(value[0].text) > 0 and len(value) == 1 and value[0].text[0] == variant_name[                                        0] and value[0].text in variant_name:
-                                        elemProduct = elemProduct.find_elements_by_xpath("./td[1]//span")
-                                        debug_out += "0"
-                                        if len(elemProduct) == 1:
-                                            debug_out += "|"
-                                            product_url = str(elemProduct[0].text)
-                                            if product_url != url_bak:
-                                                debug_out += "!"
-                                                url_bak = product_url
-                                                raise FileExistsError
-                            debug_out += "#"
-                            product_url = ""
-                            url_bak = ""
-                            break
-            except FileExistsError:
-                a = 1
-            except:
-                raise
-            if product_url == "" or len(elemProduct) != 1:
-                printRed("后台：" + out + "\t没找到这个产品")
-                printRed("\n\n" + debug_out + "\n\n")
-                self.database.finishOneChangeItem(ean, price, variant_name)
-                continue
-            self.chrome.execute_script("arguments[0].click()", elemProduct[0])
-            # self.chrome.switch_to.window(self.loginHandler)
-            # js = 'window.location.replace("' + product_url + '")'
-            # self.chrome.execute_script(js)
+
+            if is_fbs == 1:
+                self.chrome.switch_to.window(self.inventoryFbsHandler)
+            else:
+                self.chrome.switch_to.window(self.inventoryHandler)
 
             change_count, flag = self.database.isLowerThanMaxTimes(ean, variant_name)
-            if flag:
-                try:
-                    xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='sale_price_" + shop_type + "']"
-                    WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                    elemInput = self.chrome.find_element_by_xpath(xpath)
-                    value = elemInput.get_attribute("value")
-                    if value is None or value == "value" or len(value) == 0:
-                        xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_" + shop_type + "']"
-                        elemInput = self.chrome.find_element_by_xpath(xpath)
-                    old_price = round(float(elemInput.get_attribute("value")), 2)
-                    elemInput.clear()
-                    elemInput.send_keys(Keys.CONTROL, "a")
-                    elemInput.send_keys(Keys.DELETE)
-                    elemInput.send_keys(str(price))
-                    xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
-                    WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                    elemBtn = self.chrome.find_element_by_xpath(xpath)
-                    time_change = time.strftime("%Y-%m-%d %H:%M:%S")
-                    self.chrome.execute_script("arguments[0].click()", elemBtn)
-                    self.database.addAChange(ean, variant_name, old_price, price)
-                    self.database.addChangeRecord(ean, variant_name, time_change, price)
-                    out += "[" + str(change_count + 1) + "次]"
-                    printYellow("后台：" + out + "\t改价成功")
-                except:
-                    out += "[" + str(change_count) + "次]"
-                    self.exceptHandler(traceback.format_exc())
-                    printRed("后台：" + out + "\t改价失败")
-            else:
+            if not flag:
                 out += "[" + str(change_count) + "次]"
                 printRed("后台：" + out + "\t达到最大改价次数")
-            self.database.finishOneChangeItem(ean, price, variant_name)
-            self.chrome.back()
+                self.database.finishOneChangeItem(ean, price, variant_name)
+                continue
+
+            try:
+                elemInput = self.chrome.find_elements_by_xpath(".//div[@class='row collapse advanced-search-container']//input")
+                elemSearch = self.chrome.find_elements_by_xpath(".//a[@class='button postfix']")
+                if not (len(elemInput) > 0 or len(elemSearch) > 0):
+                   return -1
+                oldEan = elemInput[0].get_attribute("value")
+                elemInput[0].clear()
+                elemInput[0].send_keys(ean)
+                self.chrome.execute_script("arguments[0].click()", elemSearch[0])
+                if ean != oldEan:
+                    while True:
+                        elemLoading = self.chrome.find_element_by_xpath(".//div[@class='filterView']/div[3]")
+                        if elemLoading.get_attribute("loading") == "1":
+                            break
+                        time.sleep(0.5)
+                    time.sleep(1)
+                    while True:
+                        elemLoading = self.chrome.find_element_by_xpath(".//div[@class='filterView']/div[3]")
+                        if elemLoading.get_attribute("loading") == "0":
+                            break
+                        time.sleep(0.5)
+                time.sleep(1.5)
+                elemProduct = self.chrome.find_elements_by_xpath(".//table[@id='table-inventory']/tbody/tr[1]/td[4]")
+                if len(elemProduct) <= 0:
+                    printRed("后台：" + out + "\t没找到这个产品")
+                    self.database.finishOneChangeItem(ean, price, variant_name)
+                    continue
+                # elemProduct[0].click()
+                self.chrome.execute_script("arguments[0].click()", elemProduct[0])
+
+                elemPriceInput = self.chrome.find_elements_by_xpath(".//input[@id='editableInput']")
+                while len(elemPriceInput) <= 0:
+                    elemPriceInput = self.chrome.find_elements_by_xpath(".//input[@id='editableInput']")
+                if len(elemPriceInput) <= 0:
+                    printRed("后台：" + out + "\t无法获取产品的价格修改控件")
+                    self.database.finishOneChangeItem(ean, price, variant_name)
+                    continue
+                # old_price = round(float(str(elemPriceInput[0].get_attribute("value"))), 2)
+                old_price = price + 1
+                elemPriceInput[0].clear()
+                elemPriceInput[0].send_keys(str(price))
+                elemBtn = self.chrome.find_elements_by_xpath(".//a[@class='tiny accept-btn']")
+                if len(elemBtn) <= 0:
+                    printRed("后台：" + out + "\t无法修改价格确定按钮")
+                    self.database.finishOneChangeItem(ean, price, variant_name)
+                    continue
+                time_change = time.strftime("%Y-%m-%d %H:%M:%S")
+                self.chrome.execute_script("arguments[0].click()", elemBtn[0])
+                self.database.addAChange(ean, variant_name, old_price, price)
+                self.database.addChangeRecord(ean, variant_name, time_change, price)
+                out += "[" + str(change_count + 1) + "次]"
+                printYellow("后台：" + out + "\t改价成功")
+                self.database.finishOneChangeItem(ean, price, variant_name)
+            except:
+                self.exceptHandler(traceback.format_exc())
+                self.database.finishOneChangeItem(ean, price, variant_name)
+                continue
 
     def checkPage(self, driver):
         checkPageFinishScript = "try {if (document.readyState !== 'complete') {return false;} if (window.jQuery) { if (" \

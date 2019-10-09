@@ -66,19 +66,14 @@ class QuotesSpider(scrapy.Spider):
         # print(out)
 
     def parse(self, response):
-        for quote in response.xpath(".//div[@class='jsx-2127843686 productContainer']"):
+        for quote in response.xpath(".//div[@class='column column-block block-grid-large single-item']"):
             self.database.handlerStatus()
-            time.sleep(random.randint(0, 1))
-            fbs = quote.xpath(".//div[@class='flag flag-fbs']")
-            if len(fbs) > 0:
-                continue
+            time.sleep(random.randint(1, 3))
             data_id = quote.xpath(".//a[@class='img-link quickViewAction sPrimaryLink']/@data-id").extract()[0] + "/u/"
-            data_img = str(quote.xpath(".//a[@class='img-link quickViewAction sPrimaryLink']/@data-img").extract()[0]). \
-                           split("item_L_")[-1].split("_")[0] + "/i/?ctype=dsrch"
-            uri = str(quote.xpath(".//a[@class='img-link quickViewAction sPrimaryLink']/@href").extract()[0]). \
-                replace(data_id, data_img)
+            data_img = str(quote.xpath(".//a[@class='img-link quickViewAction sPrimaryLink']/@data-img").extract()[0]).split("item_L_")[-1].split("_")[0] + "/i/?ctype=dsrch"
+            uri = str(quote.xpath(".//a[@class='img-link quickViewAction sPrimaryLink']/@href").extract()[0]).replace(data_id, data_img)
             if uri is not None:
-                yield response.follow(uri, callback=self.parseHandler)
+                yield response.follow(uri, callback=self.parseHandler1)
 
             # 获取下一页的url, （DEL::如果没有就从头开始）
         next_page = response.xpath(".//li[@class='pagination-next goToPage']/a/@href").extract()
@@ -86,77 +81,40 @@ class QuotesSpider(scrapy.Spider):
             next_page = next_page[0].replace("page=", "section=2&page=")
             yield response.follow(next_page, callback=self.parse)
 
-    def parseHandler(self, response):
-        infos, gold_shop = self.getAllPirce_a(response)  # 获取所有的价格并以此形式返回{shop_name:[price, rating, fullfilled], ...}
-        if gold_shop == "$Rt%6y":
-            gold_shop = self.shop_name
-        ean = response._get_url().split("/")[-2]  # EAN
-        self.solutionNoon(ean, infos, gold_shop)
-
-    def parseHandler_b(self, response):
+    def parseHandler1(self, response):
         if not response.text:
             print("parseHandler_b: empty response")
             return
-        try:
-            res_json = json.loads(response.text)
-            ean = res_json["product"]["sku"]
-            variants = res_json["product"]["variants"]
-            for variant in variants:
-                try:
-                    offers = variant["offers"]
-                    variant_name = variant["variant"]
-                    if len(offers) == 0:
-                        continue
-                    infos, gold_shop = self.getAllPirce_b(offers)
-                    if self.shop_name in infos:
-                        self.solutionNoon(ean, infos, gold_shop, variant_name)
-                except ValueError:
-                    print("parseHandler_b: handler variant error: " + str(variant))
-        except ValueError:
-            print("parseHandler_b: handler json error")
-            return
+        gold_shop = str(response.xpath(".//span[@class='unit-seller-link']//b//text()").extract()[0]).lower()
+        ean = str(response.xpath(".//div[@id='productTrackingParams']/@data-ean").extract()[0])
+        url = response.xpath(".//a[@class='show-for-medium bold-text']/@href").extract()
+        if url is not None and len(url) > 0:
+            yield response.follow(url[0], callback=self.parseHandler2, meta={"ean": ean, "gold_shop": gold_shop})
 
-    def getAllPirce_a(self, response):
+    def parseHandler2(self, response):
+        infos = self.getAllPirce(response)      # 获取所有的价格并以此形式返回{shop_name:[price, rating, fullfilled], ...}
+        self.solutionNoon(response.meta["ean"], infos, response.meta["gold_shop"])
+
+    def getAllPirce(self, response):
         infos = {}
-        gold_shop = "$Rt%6y"
-        rows = response.xpath(".//ul[@class='jsx-1312782570 offersList']/li")
+        rows = response.xpath(".//div[@id='condition-all']/div[@class='row']")
         for row in rows:
-            price = row.xpath(".//span[@class='value']//text()").extract()[0]
-            price = round(float(price), 2)
-            shop_name = row.xpath(".//p[@class='jsx-1312782570']//text()").extract()
-            shop_name = str(shop_name[2]).lower()
-            if gold_shop == "$Rt%6y":
-                gold_shop = shop_name
-            ret = row.xpath(".//div[@class='jsx-3304762718 container']")
-            is_fbn = False
-            if len(ret) > 0:
-                is_fbn = True
+            price = row.xpath(".//div[@class='field price-field']//text()").extract()[0]
+            price = round(float(price.strip().split('\n')[-1].split("SAR")[0]), 2)
+            shop_name = row.xpath(".//div[@class='field seller-name']//a//text()").extract()[0].lower()
+            ret = row.xpath(".//div[@class='field clearfix labels']//div[@class='fullfilled']")
+            fullfilled = False
             rating = 100
-            infos[shop_name] = [price, rating, is_fbn]
-        if len(infos) == 0:
-            price = response.xpath(
-                ".//div[@class='jsx-2122863564 pdpPrice']//span[@class='value']//text()").extract()[0]
-            price = round(float(price), 2)
-            is_fbn = False
-            ret = response.xpath(
-                ".//div[@class='jsx-2490358733 shippingEstimatorContainer']//div[@class='jsx-3304762718 container']")
-            if len(ret) > 0:
-                is_fbn = True
-            rating = 100
-            infos[self.shop_name] = [price, rating, is_fbn]
-        return infos, gold_shop
-
-    def getAllPirce_b(self, offers):
-        infos = {}
-        gold_shop = offers[0]["store_name"].lower()
-        for offer in offers:
-            is_fbn = offer["is_fbn"] == 1
-            rating = offer["seller_score"]
-            price = offer["price"]
-            if offer["sale_price"]:
-                price = offer["sale_price"]
-            infos[offer["store_name"].lower()] = [price, rating, is_fbn]
-        return infos, gold_shop
+            if ret:
+                fullfilled = True
+            else:
+                rating = row.xpath(".//div[@class='field seller-rating']//a//text()").extract()
+                if rating:
+                    rating = round(float(rating[0].split('%')[0].split("(")[-1]), 2)
+                else:
+                    rating = 0  # no rating yet
+            infos[shop_name] = [price, rating, fullfilled]
+        return infos
 
     def solutionNoon(self, ean, infos, gold_shop, variant_name=""):
         if not self.database.isInWhiteList(ean, variant_name):
@@ -182,14 +140,14 @@ class QuotesSpider(scrapy.Spider):
                         if price < attr["self_least_price"]:
                             out = "情况C " + out + "\t不修改"
                         else:
-                            self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                            self.database.needToChangePrice(ean, price, gold_shop, variant_name, 1)
                             out = "情况C " + out + "\t差价比[" + str(round(diff1 * 100, 2)) + "%]\t改价为[" + str(price) + "]"
                 else:
                     price = round(infos[self.shop_name][0] - attr["lowwer"], 2)
                     if price < max(infos[gold_shop][0], attr["self_least_price"]):
                         out = "情况D " + out + "\t不修改"
                     else:
-                        self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                        self.database.needToChangePrice(ean, price, gold_shop, variant_name, 1)
                         out = "情况D " + out + "\t改价为[" + str(price) + "]"
 
             else:
@@ -206,214 +164,11 @@ class QuotesSpider(scrapy.Spider):
                     if price < attr["self_least_price"]:
                         out = "情况F " + out + "\t最低价[" + str(least_price) + "]\t" + "不修改"
                     else:
-                        self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                        self.database.needToChangePrice(ean, price, gold_shop, variant_name, 0)
                         out = "情况F " + out + "\t最低价[" + str(least_price) + "]\t" + "差价比[" + \
                               str(round(diff2 * 100, 2)) + "%]\t改价为[" + str(price) + "]"
         out = "前台：" + out
         print(out)
-
-    '''
-    def prase2(self, response):
-        # 黄金购物车店铺名
-        infos, gold_shop = self.getAllPirce(response)  # 获取所有的价格并以此形式返回{shop_name:[price, rating, fullfilled], ...}
-        if gold_shop == "$Rt%6y":
-            gold_shop = self.shop_name
-        ean = response._get_url().split("/")[-2]  # EAN
-        self_least_price = self.getAttr(ean)  # 获取改价参数，并返回此ean限制的最低价
-        gold_price = infos[gold_shop][0]  # 黄金购物车价格
-        self_price = infos[self.shop_name][0]  # 本店铺的price
-        percent = round(((self_price - gold_price + self.lowwer) / self_price), 2)  # 差价比
-        first_min_price = 999999  # 最低价
-        second_min_price = 999999  # 第二低价
-        first_min_shop = []  # 最低价的店铺
-        second_min_shop = []  # 第二低价的店铺
-        fbs_shop = []  # FBS店铺
-        fbs_price = 999999  # FBS店铺中的最低价
-        for key, info in infos.items():
-            if info[0] < first_min_price:
-                second_min_price = first_min_price
-                first_min_price = info[0]
-        for key, info in infos.items():
-            if info[2]:
-                fbs_shop.append(key)
-            if first_min_price == info[0]:
-                first_min_shop.append(key)
-            if second_min_price == info[0]:
-                second_min_shop.append(key)
-        for value in fbs_shop:
-            if value != self.shop_name:
-                if fbs_price > infos[value][0]:
-                    fbs_price = infos[value][0]
-        self.solution(gold_shop, ean, self_least_price, infos, gold_price, self_price, percent,
-                      first_min_price, second_min_price, first_min_shop, second_min_shop, fbs_shop, fbs_price)
-
-    # 不修改情况：
-    #       1、改价店铺是黄金购物车 and 【改价店铺的价格】不是最低价 （有买家提议可以适当考虑提价）
-    #       2、自己的其他店铺（不包括改价店铺）是黄金购物车 and 【改价店铺的价格】不比【黄金购物车的价格】低
-    #       3、其他店铺是黄金购物车 and 【黄金购物车的价格】比【改价店铺的价格】低 and 【差价比】超过【降价幅度】
-    # TODO  4、【改价次数】超过【改价次数上限】 and 【总降价比】超过【总降价比上限】 这个规则放在修改进程中判断
-    # 考虑提高价格:
-    #       5、改价店铺是黄金购物车 and 【改价店铺的价格】是最低价 --> 要判断是否只有自己一人是最低价 1、只有自己一个人是最低价
-    #       6、自己的其他店铺（不包括改价店铺）是黄金购物车 and 【改价店铺的价格】比【黄金购物车的价格】低 --> 改价为【黄金购物车的价格】
-    #       7、其他店铺是黄金购物车 and 【黄金购物车的价格】比【改价店铺的价格】高 -->（方法1：在不超过差价比的情况下一直降价   方法2：由人工处理）
-    # 考虑降低价格
-    # ##要满足的条件##  【改价次数】不超过【改价次数上限】 and 【总降价比】不超过【总降价比上限】
-    #       8、其他店铺是黄金购物车 and 【黄金购物车的价格】比【改价店铺的价格】低 and 【差价比】不超过【降价幅度】--> 改价为【黄金购物车的价格 - 降价】
-
-    #
-
-    def solution(self, gold_shop, ean, self_least_price, infos, gold_price, self_price, percent,
-                 first_min_price, second_min_price, first_min_shop, second_min_shop, fbs_shop, fbs_price):
-        percent = round(percent, 2)
-
-        # 1
-        if gold_shop == self.shop_name and self_price == gold_price and self_price > first_min_price:
-            self.handler1(ean, self_price, first_min_price, gold_shop)
-        # 2
-        elif gold_shop != self.shop_name and gold_shop in self.my_shop and self_price >= gold_price:
-            self.handler2(ean, self_price, gold_price, gold_shop)
-        # 3
-        elif gold_shop not in self.my_shop and gold_price < self_price and percent > self.percent:
-            self.handler3(ean, self_price, gold_price, gold_shop, percent)
-        # 5
-        elif gold_shop == self.shop_name and self_price == first_min_price:
-            self.handler5(ean, self_price, gold_shop, infos, first_min_price, second_min_price,
-                          first_min_shop, second_min_shop, fbs_price)
-        # 6
-        elif gold_shop != self.shop_name and gold_shop in self.my_shop and self_price < gold_price:
-            self.handler6(ean, self_price, gold_price, gold_shop)
-        # 7
-        elif gold_shop not in self.my_shop and gold_price > self_price:
-            self.handler7(ean, self_price, gold_price, gold_shop, infos, self_least_price)
-        # 8
-        elif gold_shop not in self.my_shop and gold_price < self_price and percent <= self.percent:
-            self.handler8(ean, self_price, gold_price, gold_shop, percent, self_least_price)
-
-    def handler1(self, ean, self_price, first_min_price, gold_shop):
-        out_str = "#1\t" + ean + ":" + "价格[" + str(self_price) + "]\t最低价[" + str(
-            first_min_price) + "]\t本店铺[" + gold_shop + "]"
-        print(out_str)
-
-    def handler2(self, ean, self_price, gold_price, gold_shop):
-        out_str = "#2\t" + ean + ":" + "价格[" + str(self_price) + "]\t黄金购物车价格[" + str(
-            gold_price) + "]\t自家店铺[" + gold_shop + "]"
-        print(out_str)
-
-    def handler3(self, ean, self_price, gold_price, gold_shop, percent):
-        out_str = "#3\t" + ean + ":" + "价格[" + str(self_price) + "]\t购物车[" + str(
-            gold_price) + "]\t其他店铺[" + gold_shop + "]\t差价比[" + str(round(percent*100, 2)) + "%]"
-        print(out_str)
-
-    def handler5(self, ean, self_price, gold_shop, infos, first_min_price, second_min_price,
-                 first_min_shop, second_min_shop, fbs_price):
-        out_str = "#5\t" + ean + ":" + "价格[" + str(self_price) + "]\t最低价[" + str(
-            first_min_price) + "]\t本店铺[" + gold_shop + "]\t"
-        to_price = 0
-        if infos[self.shop_name][2]:  # 是否是FBS
-            if len(first_min_shop) == 1:  # 是否只有自己一家是最低价
-                # 判断second_min_shop中是否有店铺是fbs
-                for value in second_min_shop:
-                    if infos[value][2]:
-                        to_price = infos[value][0]
-                        break
-                memo = "改价店铺（FBS）是黄金购物车,且只有改价店铺一家是最低价(" + str(first_min_price) + ")," + \
-                       "第二低价格(" + str(second_min_price) + ")中"
-                if to_price == 0:
-                    memo += "没有FBS店铺"
-                    if fbs_price < 999999:
-                        memo += ",FBS店铺中的最低价格是(" + str(fbs_price) + ")"
-                else:
-                    memo += "有FBS店铺"
-                    to_price = to_price - self.lowwer
-                    if to_price != self_price:
-                        out_str += "改价为[" + str(to_price) + "]"
-                        self.needToChangePrice(ean, to_price, gold_shop)
-                self.sendNotice(ean, memo)
-            else:
-                flag1 = False
-                for value in first_min_shop:
-                    if infos[value][2]:
-                        flag1 = True
-                        break
-                memo = "改价店铺（FBS）是黄金购物车,不止改价店铺一家是最低价(" + str(first_min_price) + ")," + \
-                       "最低价格中"
-                if not flag1:
-                    memo += "没有FBS店铺"
-                    if fbs_price < 999999:
-                        memo += ",FBS店铺中的最低价格是(" + str(fbs_price) + ")"
-                else:
-                    memo += "有FBS店铺"
-                self.sendNotice(ean, memo)
-        else:  # 不是FBS
-            if len(first_min_shop) == 1:  # 是否只有自己一家是最低价
-                # 判断min_second_price_shop中是否有店铺是fbs
-                for value in second_min_shop:
-                    if infos[value][2]:
-                        to_price = infos[value][0]
-                        break
-                memo = "改价店铺（非FBS）是黄金购物车,且只有改价店铺一家是最低价(" + str(first_min_price) + ")," + \
-                       "第二低价格(" + second_min_price + ")中"
-                if to_price == 0:
-                    memo += "没有FBS店铺"
-                    if fbs_price < 999999:
-                        memo += ",FBS店铺中的最低价格是(" + str(fbs_price) + ")"
-                else:
-                    memo += "有FBS店铺"
-                    to_price = to_price - self.lowwer
-                    if to_price != self_price:
-                        out_str += "改价为[" + str(to_price) + "]"
-                        self.needToChangePrice(ean, to_price, gold_shop)
-                self.sendNotice(ean, memo)
-            else:
-                flag1 = False
-                for value in first_min_shop:
-                    if infos[value][2]:
-                        flag1 = True
-                        break
-                memo = "改价店铺（非FBS）是黄金购物车,不止改价店铺一家是最低价(" + str(first_min_price) + ")," + \
-                       "最低价格中"
-                if not flag1:
-                    memo += "没有FBS店铺"
-                    if fbs_price < 999999:
-                        memo += ",FBS店铺中的最低价格是(" + str(fbs_price) + ")"
-                else:
-                    memo += "有FBS店铺"
-                self.sendNotice(ean, memo)
-        print(out_str)
-
-    def handler6(self, ean, self_price, gold_price, gold_shop):
-        out_str = "#6\t" + ean + ":" + "价格[" + str(self_price) + "]\t购物车[" + str(gold_price) + \
-                  "]\t自家店铺[" + gold_shop + "]\t修改"
-        print(out_str)
-        self.needToChangePrice(ean, gold_price, gold_shop)
-
-    def handler7(self, ean, self_price, gold_price, gold_shop, infos, self_least_price):
-        out_str = "#7\t" + ean + ":" + "价格[" + str(self_price) + "]\t购物车[" + str(
-            gold_price) + "]其他店铺[" + gold_shop + "]"
-        if (not infos[gold_shop][2]) and infos[self.shop_name][2]:  # 黄金购物车不是FBS 自家店铺是FBS
-            memo = "黄金购物车(" + gold_shop + ":" + str(infos[gold_shop][0]) + \
-                   ")不是FBS, 改价店铺(" + infos[self.shop_name][0] + ")是FBS"
-            self.sendNotice(ean, memo)
-        else:
-            to_price = self_price - self.lowwer
-            if to_price < self_least_price:
-                out_str += "改价[" + str(to_price) + "]" + "低于此EAN最低价限制[" + self_least_price + "]"
-            else:
-                out_str += "改价为[" + str(to_price) + "]"
-                self.needToChangePrice(ean, to_price, gold_shop)
-        print(out_str)
-
-    def handler8(self, ean, self_price, gold_price, gold_shop, percent, self_least_price):
-        out_str = "#8\t" + ean + ":" + "价格[" + str(self_price) + "]\t购物车[" + str(
-            gold_price) + "]\t其他店铺[" + gold_shop + "]\t差价比[" + str(round(percent*100, 2)) + "%]\t"
-        to_price = gold_price - self.lowwer
-        if to_price < self_least_price:
-            out_str += "改价[" + str(to_price) + "]" + "低于此EAN最低价限制[" + self_least_price + "]"
-        else:
-            out_str += "改价为[" + str(to_price) + "]"
-            self.needToChangePrice(ean, to_price, gold_shop)
-        print(out_str)
-    '''
 
 
 class SpiderProcess(multiprocessing.Process):
