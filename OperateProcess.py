@@ -3,12 +3,14 @@ import time
 import requests
 import json
 import traceback
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from DataManager import DataManager
+
 CHROME_DRIVER_PATH = "../chromedriver.exe"
 
 
@@ -102,11 +104,11 @@ class OperateProcess(multiprocessing.Process):
                 raise
 
     def NewInventory(self):
-        if not self.database.shopLock():
-            printYellow("后台：已经超出店铺数量限制")
-            self.database.setStopStatus()
-            while True:
-                time.sleep(6000)
+        # if not self.database.shopLock():
+        #     printYellow("后台：已经超出店铺数量限制")
+        #     self.database.setStopStatus()
+        #     while True:
+        #         time.sleep(6000)
         printYellow("后台：打开改价页面")
         self.loginHandler = self.chrome.current_window_handle
         handlers = self.chrome.window_handles
@@ -241,6 +243,7 @@ class OperateProcess(multiprocessing.Process):
             self.database.finishOneChangeItem(ean, price, variant_name)
 
     def OperateProductSelenium(self):
+        item_sku_xpath = ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a"
         shop_type = self.database.getShopType()
         if shop_type == "ksa":
             shop_type = "sa"
@@ -251,9 +254,10 @@ class OperateProcess(multiprocessing.Process):
         url_bak = ""
         while True:
             self.database.handlerStatus()
-            time.sleep(1)
+            # time.sleep(1)
             ean, price, variant_name = self.database.getFirstNeedChangeItem()
             if ean == "ean" and price == "price":
+                time.sleep(1)
                 continue
             out = time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + "[" + variant_name + "]\t" + str(round(price, 2))
             self.chrome.switch_to.window(self.inventoryHandler)
@@ -262,20 +266,21 @@ class OperateProcess(multiprocessing.Process):
                 WebDriverWait(self.chrome, 120, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                 elemSearch = self.chrome.find_element_by_xpath('.//div[@class="jsx-3807287210 searchWrapper"]//input')
                 elemSearch.clear()
-                elemSearch.send_keys(ean)
+                self.chrome.execute_script("arguments[0].value='" + ean + "';", elemSearch)
+                elemSearch.send_keys(" ")
+
                 debug_out = ""
                 while 1:
                     time.sleep(1.5)
-                    e1 = self.chrome.find_elements_by_xpath(
-                        ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
+                    # WebDriverWait(self.chrome, 10, 0.5).until(self.checkPage)
+                    e1 = self.chrome.find_elements_by_xpath(item_sku_xpath)
                     e2 = self.chrome.find_elements_by_xpath(
                         ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
                         "//div[@class='jsx-3793681198 text']")
                     if not (len(e1) == 1 or len(e2) == 1):
                         continue
                     debug_out += "1"
-                    elemProducts = self.chrome.find_elements_by_xpath(
-                        ".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
+                    elemProducts = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
                     if len(elemProducts) >= 1:
                         debug_out += "2"
                         elemProduct = self.chrome.find_elements_by_xpath(
@@ -288,17 +293,18 @@ class OperateProcess(multiprocessing.Process):
                             break
                         if len(elemProducts) == 1:
                             debug_out += "4"
-                            elemProduct = self.chrome.find_elements_by_xpath(
-                                ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
+                            elemProduct = self.chrome.find_elements_by_xpath(item_sku_xpath)
                             product_url = str(elemProduct[0].text)
                             if product_url != url_bak:
                                 debug_out += "5"
                                 url_bak = product_url
                                 break
+                        elif len(elemProducts) < 1 or len(elemProducts) > 13:
+                            elemSearch.send_keys(" ")
+                            continue
                         else:
                             debug_out += "6"
-                            e1 = self.chrome.find_elements_by_xpath(
-                                ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//span")
+                            e1 = self.chrome.find_elements_by_xpath(item_sku_xpath)
                             if not len(e1) == 1:
                                 debug_out += "$"
                                 continue
@@ -313,8 +319,8 @@ class OperateProcess(multiprocessing.Process):
                                 if len(key) == 1:
                                     value = key[0].find_elements_by_xpath("./following-sibling::div[1]")
                                     debug_out += "9" + value[0].text
-                                    if len(value[0].text) > 0 and len(value) == 1 and value[0].text[0] == variant_name[                                        0] and value[0].text in variant_name:
-                                        elemProduct = elemProduct.find_elements_by_xpath("./td[1]//span")
+                                    if len(value[0].text) > 0 and len(value) == 1 and value[0].text[0] == variant_name[0] and value[0].text in variant_name:
+                                        elemProduct = elemProduct.find_elements_by_xpath("./td[1]//a")  # change when item_sku_xpath change
                                         debug_out += "0"
                                         if len(elemProduct) == 1:
                                             debug_out += "|"
