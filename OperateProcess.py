@@ -104,11 +104,11 @@ class OperateProcess(multiprocessing.Process):
                 raise
 
     def NewInventory(self):
-        # if not self.database.shopLock():
-        #     printYellow("后台：已经超出店铺数量限制")
-        #     self.database.setStopStatus()
-        #     while True:
-        #         time.sleep(6000)
+        if not self.database.shopLock():
+            printYellow("后台：已经超出店铺数量限制")
+            self.database.setStopStatus()
+            while True:
+                time.sleep(6000)
         printYellow("后台：打开改价页面")
         self.loginHandler = self.chrome.current_window_handle
         handlers = self.chrome.window_handles
@@ -274,15 +274,18 @@ class OperateProcess(multiprocessing.Process):
                     time.sleep(1.5)
                     # WebDriverWait(self.chrome, 10, 0.5).until(self.checkPage)
                     e1 = self.chrome.find_elements_by_xpath(item_sku_xpath)
-                    e2 = self.chrome.find_elements_by_xpath(
-                        ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
-                        "//div[@class='jsx-3793681198 text']")
+                    e2 = self.chrome.find_elements_by_xpath("//table/tbody/tr//div[@class='jsx-3793681198 text']")
                     if not (len(e1) == 1 or len(e2) == 1):
                         continue
                     debug_out += "1"
                     elemProducts = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
                     if len(elemProducts) >= 1:
                         debug_out += "2"
+                        if len(e2) == 1:
+                            debug_out += "a"
+                            product_url = ""
+                            url_bak = ""
+                            break
                         elemProduct = self.chrome.find_elements_by_xpath(
                             ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
                             "//div[@class='jsx-3793681198 text']")

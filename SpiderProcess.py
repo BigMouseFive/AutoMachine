@@ -92,7 +92,9 @@ class QuotesSpider(scrapy.Spider):
             ".//div[@class='jsx-2341487112 paginationWrapper']//a[@class='nextLink']/@aria-disabled").extract()[0])
         if value is not None and value == "false":
             self.page_index = self.page_index + 1
-            next_page = self.start_urls[0] + "?page=" + str(self.page_index)
+            if self.page_index > 50:
+                return
+            next_page = self.start_urls[0] + "&page=" + str(self.page_index)
             yield response.follow(next_page, callback=self.parse)
 
     def parseHandler_a(self, response):

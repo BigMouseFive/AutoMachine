@@ -163,6 +163,7 @@ class DataManager:
             ret = conn.execute("select shop_id from 'shopInfo' where shop=?;", (self.name,)).fetchall()
             if len(ret) > 0:
                 url[0] = url[0] + ret[0][0]
+                url[0] = url[0] + "?limit=150"
         except:
             url = []
         conn.close()
