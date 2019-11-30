@@ -104,11 +104,11 @@ class OperateProcess(multiprocessing.Process):
                 raise
 
     def NewInventory(self):
-        if not self.database.shopLock():
-            printYellow("后台：已经超出店铺数量限制")
-            self.database.setStopStatus()
-            while True:
-                time.sleep(6000)
+        # if not self.database.shopLock():
+        #     printYellow("后台：已经超出店铺数量限制")
+        #     self.database.setStopStatus()
+        #     while True:
+        #         time.sleep(6000)
         printYellow("后台：打开改价页面")
         self.loginHandler = self.chrome.current_window_handle
         handlers = self.chrome.window_handles
@@ -342,7 +342,7 @@ class OperateProcess(multiprocessing.Process):
                 raise
             if product_url == "" or len(elemProduct) != 1:
                 printRed("后台：" + out + "\t没找到这个产品")
-                printRed("\n\n" + debug_out + "\n\n")
+                # printRed("\n\n" + debug_out + "\n\n")
                 self.database.finishOneChangeItem(ean, price, variant_name)
                 continue
             self.chrome.execute_script("arguments[0].click()", elemProduct[0])
@@ -353,19 +353,19 @@ class OperateProcess(multiprocessing.Process):
             change_count, flag = self.database.isLowerThanMaxTimes(ean, variant_name)
             if flag:
                 try:
-                    xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='sale_price_" + shop_type + "']"
+                    xpath = ".//div[@class='jsx-3185603393 priceInputWrapper']//input[@name='sale_price_" + shop_type + "']"
                     WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                     elemInput = self.chrome.find_element_by_xpath(xpath)
                     value = elemInput.get_attribute("value")
                     if value is None or value == "value" or len(value) == 0:
-                        xpath = ".//div[@class='jsx-509839755 priceInputWrapper']//input[@name='price_" + shop_type + "']"
+                        xpath = ".//div[@class='jsx-3185603393 priceInputWrapper']//input[@name='price_" + shop_type + "']"
                         elemInput = self.chrome.find_element_by_xpath(xpath)
                     old_price = round(float(elemInput.get_attribute("value")), 2)
                     elemInput.clear()
                     elemInput.send_keys(Keys.CONTROL, "a")
                     elemInput.send_keys(Keys.DELETE)
                     elemInput.send_keys(str(price))
-                    xpath = ".//div[@class='jsx-509839755 fixedBottom']/button"
+                    xpath = ".//div[@class='jsx-3185603393 fixedBottom']/button"
                     WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
                     elemBtn = self.chrome.find_element_by_xpath(xpath)
                     time_change = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -396,3 +396,6 @@ class OperateProcess(multiprocessing.Process):
                                 "$timeout(function() { window.qa.doneRendering = true;}, 0); return false;}} return " \
                                 "true;} catch (ex) {return false;} "
         return driver.execute_script(checkPageFinishScript)
+
+
+# timeout 357 367 385 137 270

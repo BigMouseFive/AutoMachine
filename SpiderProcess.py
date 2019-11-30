@@ -74,15 +74,14 @@ class QuotesSpider(scrapy.Spider):
             add_headers = {"x-locale": "en-sa"}
         elif shop_type == "uae":
             add_headers = {"x-locale": "en-ae"}
-        for quote in response.xpath(".//div[@class='jsx-2127843686 productContainer']"):
+        for quote in response.xpath(".//div[@class='jsx-3152181095 productContainer']"):
             self.database.handlerStatus()
             time.sleep(random.randint(0, 1))
             uri = ""
             if handler == "parseHandler_a":
-                uri = "https://www.noon.com" + str(quote.xpath(".//a[@class='jsx-4244116889 product']/@href").extract()[0])
+                uri = "https://www.noon.com" + str(quote.xpath(".//a[@class='jsx-1833788615 product']/@href").extract()[0])
             elif handler == "parseHandler_b":
-                uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[@class='jsx-4244116889 "
-                                                                                   "product']/@href").extract()[0])
+                uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[@class='jsx-1833788615 product']/@href").extract()[0])
             if uri is not None:
                 uri = uri.split('?')[0]
                 yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
