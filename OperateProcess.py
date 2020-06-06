@@ -43,11 +43,10 @@ class OperateProcess(multiprocessing.Process):
             str = f.read()  # 将txt文件的所有内容读入到字符串str中
             f.close()  # 将文件关闭
             option = webdriver.ChromeOptions()
-            option.add_argument("user-data-dir=" + os.path.abspath(str))
-            option = webdriver.ChromeOptions()
+            option.add_argument("--user-data-dir=" + os.path.abspath(str))
             option.add_argument('--no-sandbox')
             option.add_argument('--disable-dev-shm-usage')
-            option.add_argument("headless")
+            # option.add_argument("headless")
             option.add_argument('ignore-certificate-errors')
             option.add_argument('log-level=3')
             option.add_argument('lang=zh_CN.UTF-8')
@@ -154,30 +153,36 @@ class OperateProcess(multiprocessing.Process):
             if handler != self.loginHandler and handler != unknownHandler and handler != self.inventoryFbsHandler:
                 self.inventoryHandler = handler
                 break
-
+        printYellow("后台：开始改价")
         while 1:
             try:
-                self.OperateProductSelenium()
+                ret = self.OperateProductSelenium()
+                if ret == -2:
+                    printYellow("后台：未获取到搜索框，将刷新界面")
+                    self.chrome.refresh()
+                elif ret == -1:
+                    return -1
             except:
                 self.exceptHandler(traceback.format_exc())
                 self.chrome.refresh()
                 continue
 
     def OperateProductSelenium(self):
-        printYellow("后台：开始改价")
         while True:
             self.database.handlerStatus()
             time.sleep(1)
             ean, price, variant_name, is_fbs = self.database.getFirstNeedChangeItem()
             if ean == "ean" and price == "price":
                 continue
-            out = time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + "[" + variant_name + "]\t" + str(round(price, 2))
 
             if is_fbs == 1:
                 self.chrome.switch_to.window(self.inventoryFbsHandler)
+                out = time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + "[fbs]\t" + str(round(price, 2))
             else:
                 self.chrome.switch_to.window(self.inventoryHandler)
+                out = time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + "[]\t" + str(round(price, 2))
 
+            WebDriverWait(self.chrome, 240, 0.5).until(self.checkPage)
             change_count, flag = self.database.isLowerThanMaxTimes(ean, variant_name)
             if not flag:
                 out += "[" + str(change_count) + "次]"
@@ -189,30 +194,34 @@ class OperateProcess(multiprocessing.Process):
                 elemInput = self.chrome.find_elements_by_xpath(".//div[@class='row collapse advanced-search-container']//input")
                 elemSearch = self.chrome.find_elements_by_xpath(".//a[@class='button postfix']")
                 if not (len(elemInput) > 0 or len(elemSearch) > 0):
-                   return -1
+                    return -2
                 oldEan = elemInput[0].get_attribute("value")
                 elemInput[0].clear()
                 elemInput[0].send_keys(ean)
                 self.chrome.execute_script("arguments[0].click()", elemSearch[0])
+                count = 0
                 if ean != oldEan:
-                    while True:
+                    while count < 8:
                         elemLoading = self.chrome.find_element_by_xpath(".//div[@class='filterView']/div[3]")
                         if elemLoading.get_attribute("loading") == "1":
                             break
                         time.sleep(0.5)
+                        count += 1
                     time.sleep(1)
-                    while True:
+                    count = 0
+                    while count < 14:
                         elemLoading = self.chrome.find_element_by_xpath(".//div[@class='filterView']/div[3]")
                         if elemLoading.get_attribute("loading") == "0":
                             break
                         time.sleep(0.5)
+                        count += 1
+
                 time.sleep(1.5)
                 elemProduct = self.chrome.find_elements_by_xpath(".//table[@id='table-inventory']/tbody/tr[1]/td[4]")
-                if len(elemProduct) <= 0:
+                if len(elemProduct) <= 0 or count >= 14:
                     printRed("后台：" + out + "\t没找到这个产品")
                     self.database.finishOneChangeItem(ean, price, variant_name)
                     continue
-                # elemProduct[0].click()
                 self.chrome.execute_script("arguments[0].click()", elemProduct[0])
 
                 elemPriceInput = self.chrome.find_elements_by_xpath(".//input[@id='editableInput']")
@@ -222,7 +231,6 @@ class OperateProcess(multiprocessing.Process):
                     printRed("后台：" + out + "\t无法获取产品的价格修改控件")
                     self.database.finishOneChangeItem(ean, price, variant_name)
                     continue
-                # old_price = round(float(str(elemPriceInput[0].get_attribute("value"))), 2)
                 old_price = price + 1
                 elemPriceInput[0].clear()
                 elemPriceInput[0].send_keys(str(price))
@@ -241,7 +249,7 @@ class OperateProcess(multiprocessing.Process):
             except:
                 self.exceptHandler(traceback.format_exc())
                 self.database.finishOneChangeItem(ean, price, variant_name)
-                continue
+                return -2
 
     def checkPage(self, driver):
         checkPageFinishScript = "try {if (document.readyState !== 'complete') {return false;} if (window.jQuery) { if (" \
