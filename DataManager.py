@@ -14,17 +14,38 @@ class DataManager:
         self.name = name
         self.lock = threading.Lock()
 
+    def addTest(self, ean, shop, price, is_fbn, is_least, shop_l, least, shop_lf, least_fbn):
+        self.lock.acquire()
+        conn = sqlite3.connect(self.name + ".ggc")
+        conn.execute("insert into 'test'(ean, shop, price, is_fbn, is_least, shop_l, least, shop_lf, least_fbn) "
+                     "values (?,?,?,?,?,?,?,?,?);", (ean, shop, price, is_fbn, is_least, shop_l, least, shop_lf, least_fbn))
+        conn.commit()
+        self.lock.release()
+
     def initShopDataBase(self):
         self.lock.acquire()
         conn = sqlite3.connect(self.name + ".ggc")
         c = conn.cursor()
+        c.execute("DROP TABLE IF EXISTS 'test';")
+        c.execute('''CREATE TABLE 'test'
+                                       (ean       TEXT    NOT NULL,
+                                        shop      TEXT    NOT NULL,
+                                        price     DOUBLE  NOT NULL,
+                                        is_fbn    INT     NOT NULL,
+                                        is_least  INT     NOT NULL,
+                                        shop_l    TEXT    NOT NULL,
+                                        least     DOUBLE  NOT NULL,
+                                        shop_lf   TEXT    NOT NULL,
+                                        least_fbn DOUBLE  NOT NULL
+                                        );''')
         c.execute("DROP TABLE IF EXISTS 'item';")
         c.execute('''CREATE TABLE 'item'
-                               (ean       TEXT    NOT NULL,
-                                variant_name TEXT NOT NULL DEFAULT '',
-                                price     DOUBLE  NOT NULL,
-                                shop      TEXT    NOT NULL,
-                                primary key (ean, variant_name));''')
+                                       (ean       TEXT    NOT NULL,
+                                        variant_name TEXT NOT NULL DEFAULT '',
+                                        price     DOUBLE  NOT NULL,
+                                        is_fbs    INT     NOT NULL,
+                                        shop      TEXT    NOT NULL,
+                                        primary key (ean, variant_name));''')
         c.execute("DROP TABLE IF EXISTS 'notice';")
         c.execute('''CREATE TABLE 'notice'
                                        (ean    TEXT  NOT NULL,
@@ -192,12 +213,12 @@ class DataManager:
         self.lock.release()
         return flag
 
-    def needToChangePrice(self, ean, price, gold_shop, variant_name):
+    def needToChangePrice(self, ean, price, gold_shop, variant_name, is_fbs):
         # 将需要修改的添加到item表中
         self.lock.acquire()
         conn = sqlite3.connect(self.name + ".ggc")
-        conn.execute("REPLACE INTO 'item'(ean, variant_name, price, shop) VALUES (?, ?, ?, ?);",
-                     (ean, variant_name, price, gold_shop))
+        conn.execute("REPLACE INTO 'item'(ean, variant_name, is_fbs, price, shop) VALUES (?, ?, ?, ?, ?);",
+                     (ean, variant_name, is_fbs, price, gold_shop))
         conn.commit()
         conn.close()
         self.lock.release()
@@ -222,15 +243,15 @@ class DataManager:
         return a, p
 
     def getFirstNeedChangeItem(self):
-        e, p, v = "ean", "price", "variant_name"
+        e, p, v, i = "ean", "price", "variant_name", "is_fbs"
         self.lock.acquire()
         conn = sqlite3.connect(self.name + ".ggc")
-        ret = conn.execute("SELECT ean, price, variant_name FROM 'item' LIMIT 1;").fetchall()
+        ret = conn.execute("SELECT ean, price, variant_name, is_fbs FROM 'item' LIMIT 1;").fetchall()
         if len(ret) > 0:
-            e, p, v = ret[0][0], ret[0][1], ret[0][2]
+            e, p, v, i = ret[0][0], ret[0][1], ret[0][2], ret[0][3]
         conn.close()
         self.lock.release()
-        return e, p, v
+        return e, p, v, i
 
     def finishOneChangeItem(self, ean, price, variant_name):
         self.lock.acquire()
