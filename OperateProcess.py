@@ -37,14 +37,13 @@ class OperateProcess(multiprocessing.Process):
         self.debug_file.flush()
 
     def run(self):  # 固定用run方法，启动进程自动调用run方法
-        self.debug_file = open(self.name + ".debuginfo", "a")
         self.database = DataManager(self.name)
         printYellow("启动后台改价任务")
         while 1:
             option = webdriver.ChromeOptions()
             option.add_argument('--no-sandbox')
             option.add_argument('--disable-dev-shm-usage')
-            option.add_argument("headless")
+            # option.add_argument("headless")
             option.add_argument('ignore-certificate-errors')
             option.add_argument('log-level=3')
             option.add_argument('lang=zh_CN.UTF-8')

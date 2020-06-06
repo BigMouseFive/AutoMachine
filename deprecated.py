@@ -20,37 +20,37 @@ def pre_test(name):
             print("PermissionError")
 
 
-# if __name__ == '__main__':
-#     freeze_support()
-#     name = sys.argv[1]
-#     os.system("title AutoMacine " + name)
-#     os.chdir(os.path.split(os.path.realpath(__file__))[0])
-#     pre_test(name)
-#     p1 = OperateProcess(name)
-#     p1.start()
-#     while True:
-#         p = SpiderProcess(name=name)
-#         p.start()
-#         p.join()
-#         database = DataManager(name)
-#         database.handlerStatus()
+if __name__ == '__main__':
+    freeze_support()
+    name = sys.argv[1]
+    os.system("title AutoMacine " + name)
+    os.chdir(os.path.split(os.path.realpath(__file__))[0])
+    pre_test(name)
+    p1 = OperateProcess(name)
+    p1.start()
+    while True:
+        p = SpiderProcess(name=name)
+        p.start()
+        p.join()
+        database = DataManager(name)
+        database.handlerStatus()
 
-
-def skr(name):
-    if __name__ == '__main__':
-        # os.system("title AutoMacine " + name)
-        freeze_support()
-        os.chdir(os.path.split(os.path.realpath(__file__))[0])
-        pre_test(name)
-        p1 = OperateProcess(name)
-        p1.start()
-        while True:
-            p = SpiderProcess(name=name)
-            p.start()
-            p.join()
-            database = DataManager(name)
-            database.handlerStatus()
-
-
-skr("BuyMore")
+#
+# def skr(name):
+#     if __name__ == '__main__':
+#         # os.system("title AutoMacine " + name)
+#         freeze_support()
+#         os.chdir(os.path.split(os.path.realpath(__file__))[0])
+#         pre_test(name)
+#         p1 = OperateProcess(name)
+#         p1.start()
+#         while True:
+#             p = SpiderProcess(name=name)
+#             p.start()
+#             p.join()
+#             database = DataManager(name)
+#             database.handlerStatus()
+#
+#
+# skr("BuyMore")
 

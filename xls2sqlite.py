@@ -175,31 +175,31 @@ class S2X:
             exit(-1)
 
 
-os.system("title AutoMachine Helper")
-try:
-    method = sys.argv[1]
-    if method == "GoldCar":
-        # 注意 xlwt 是以xls方式保存表格的 所以保存的文件名后缀得是xls
-        s2x = S2X(sys.argv[2], sys.argv[3])
-        s2x.exportGoldCar()
-    elif method == "WhiteShop":
-        x2s = X2S(sys.argv[2], sys.argv[3])
-        x2s.addWhiteShop(sys.argv[4])
-    elif method == "WhiteList":
-        x2s = X2S(sys.argv[2], sys.argv[3])
-        x2s.addWhiteList(sys.argv[4])
-    elif method == "ProductAttr":
-        x2s = X2S(sys.argv[2], sys.argv[3])
-        x2s.addProductAttr(sys.argv[4])
-    elif method == "ChangePrice":
-        s2x = S2X(sys.argv[2], sys.argv[3])
-        s2x.exportChangePrice()
-except:
-    print("出现异常")
-    # os.system("pause")
-    exit(-1)
+# os.system("title AutoMachine Helper")
+# try:
+#     method = sys.argv[1]
+#     if method == "GoldCar":
+#         # 注意 xlwt 是以xls方式保存表格的 所以保存的文件名后缀得是xls
+#         s2x = S2X(sys.argv[2], sys.argv[3])
+#         s2x.exportGoldCar()
+#     elif method == "WhiteShop":
+#         x2s = X2S(sys.argv[2], sys.argv[3])
+#         x2s.addWhiteShop(sys.argv[4])
+#     elif method == "WhiteList":
+#         x2s = X2S(sys.argv[2], sys.argv[3])
+#         x2s.addWhiteList(sys.argv[4])
+#     elif method == "ProductAttr":
+#         x2s = X2S(sys.argv[2], sys.argv[3])
+#         x2s.addProductAttr(sys.argv[4])
+#     elif method == "ChangePrice":
+#         s2x = S2X(sys.argv[2], sys.argv[3])
+#         s2x.exportChangePrice()
+# except:
+#     print("出现异常")
+#     # os.system("pause")
+#     exit(-1)
 
 # a = X2S("C:/Users/79054/Desktop/record.xls", "D:/Utils/AutoMachine/VisualStudio2013WorkPlatform/lemon01/x64/Debug/DataBase.db")
 # a.addWhiteList("BuyMore")
-# a = S2X("D:/Utils/AutoMachine/VisualStudio2013WorkPlatform/automachine/pak_installer/dist/deprecated/BuyMore.db", "C:/Users/79054/Desktop/record.xls")
-# a.exportGoldCar()
+a = S2X("Buymore.ggc", "C:/Users/79054/Desktop/record.xls")
+a.exportGoldCar()

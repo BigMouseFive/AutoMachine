@@ -153,7 +153,7 @@ class DataManager:
         url = []
         shop_type = self.getShopType()
         if shop_type == "ksa":
-            url = ["https://www.noon.com/saudi-en/"]
+                url = ["https://www.noon.com/saudi-en/"]
         elif shop_type == "uae":
             url = ["https://www.noon.com/uae-en/"]
 

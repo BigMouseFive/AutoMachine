@@ -81,7 +81,7 @@ class QuotesSpider(scrapy.Spider):
             if handler == "parseHandler_a":
                 uri = "https://www.noon.com" + str(quote.xpath(".//a[@class='jsx-1833788615 product']/@href").extract()[0])
             elif handler == "parseHandler_b":
-                uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[@class='jsx-1833788615 product']/@href").extract()[0])
+                uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[@class='jsx-866269109 product']/@href").extract()[0])
             if uri is not None:
                 uri = uri.split('?')[0]
                 yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
@@ -160,8 +160,11 @@ class QuotesSpider(scrapy.Spider):
         infos = {}
         gold_shop = offers[0]["store_name"].lower()
         for offer in offers:
+            print(offer)
             is_fbn = offer["is_fbn"] == 1
-            rating = offer["seller_score"]
+            rating = 0.99
+            if "seller_score" in offer:
+                rating = offer["seller_score"]
             price = offer["price"]
             if offer["sale_price"]:
                 price = offer["sale_price"]
