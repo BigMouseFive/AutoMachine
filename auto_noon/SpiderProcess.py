@@ -50,7 +50,7 @@ from multiprocessing import Process
 import random
 import json
 import time
-from DataManager import DataManager
+from auto_noon.DataManager import DataManager
 
 
 class QuotesSpider(scrapy.Spider):
@@ -62,12 +62,11 @@ class QuotesSpider(scrapy.Spider):
         self.shop_name = shop_name.lower()
         self.start_urls = self.database.getScrapyUrl()
         self.page_index = 1
+        self.handler = "parseHandler_b"
         # out = "抓取数据：" + self.start_urls[0]
         # print(out)
 
     def parse(self, response):
-        handler = "parseHandler_b"
-
         shop_type = self.database.getShopType()
         add_headers = {}
         if shop_type == "ksa":
@@ -77,22 +76,24 @@ class QuotesSpider(scrapy.Spider):
         # for quote in response.xpath(".//div[@class='jsx-3152181095 productContainer']"):
         for quote in response.xpath(".//div[contains(@class, 'productContainer')]"):
             self.database.handlerStatus()
-            time.sleep(random.randint(0, 1))
+            time.sleep(random.uniform(0.5, 2.5))
             uri = ""
-            if handler == "parseHandler_a":
-                # uri = "https://www.noon.com" + str(quote.xpath(".//a[@class='jsx-1833788615 product']/@href").extract()[0])
+            if self.handler == "parseHandler_a":
                 uri = "https://www.noon.com" + str(quote.xpath(".//a[contains(@class, 'product')]/@href").extract()[0])
-            elif handler == "parseHandler_b":
-                # uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[@class='jsx-564649128 product']/@href").extract()[0])
+            elif self.handler == "parseHandler_b" or self.handler == "parseHandler_c":
                 uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[contains(@class, 'product')]/@href").extract()[0])
             if uri is not None:
                 uri = uri.split('?')[0]
-                yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
+                if self.handler == "parseHandler_a":
+                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_a)
+                elif self.handler == "parseHandler_b":
+                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
+                elif self.handler == "parseHandler_c":
+                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_c)
 
         # 获取下一页的url, （DEL::如果没有就从头开始）
         value = str(response.xpath(
             ".//div[contains(@class, 'paginationWrapper')]//a[@class='nextLink']/@aria-disabled").extract()[0])
-            # ".//div[@class='jsx-2341487112 paginationWrapper']//a[@class='nextLink']/@aria-disabled").extract()[0])
         if value is not None and value == "false":
             self.page_index = self.page_index + 1
             if self.page_index > 50:
@@ -130,21 +131,42 @@ class QuotesSpider(scrapy.Spider):
             print("parseHandler_b: handler json error")
             return
 
+    def parseHandler_c(self, response):
+        if not response.text:
+            print("parseHandler_c: empty response")
+            return
+        try:
+            res_json = json.loads(response.text)
+            sku = res_json["product"]["sku"]
+            if not sku: sku = ""
+            brand = res_json["product"]["brand"]
+            if not brand: brand = ""
+            specifications = res_json["product"]["specifications"]
+            model_name = " "
+            model_number = " "
+            for specification in specifications:
+                if specification["code"] == "model_number":
+                    model_number = specification["value"]
+                if specification["code"] == "model_name":
+                    model_name = specification["value"]
+
+            print(sku + "," + str(model_name) + "," + str(model_number))
+        except ValueError:
+            print("parseHandler_c: handler json error")
+            return
+
     def getAllPirce_a(self, response):
         infos = {}
         gold_shop = "$Rt%6y"
         rows = response.xpath(".//ul[contains(@class, 'offersList')]/li")
-        # rows = response.xpath(".//ul[@class='jsx-1312782570 offersList']/li")
         for row in rows:
             price = row.xpath(".//span[@class='value')]//text()").extract()[0]
             price = round(float(price), 2)
             shop_name = row.xpath(".//p[@class='jsx-1312782570')]//text()").extract()
-            # shop_name = row.xpath(".//p[@class='jsx-1312782570']//text()").extract()
             shop_name = str(shop_name[2]).lower()
             if gold_shop == "$Rt%6y":
                 gold_shop = shop_name
             ret = row.xpath(".//div[contains(@class, 'container')]")
-            # ret = row.xpath(".//div[@class='jsx-3304762718 container']")
             is_fbn = False
             if len(ret) > 0:
                 is_fbn = True
@@ -153,12 +175,10 @@ class QuotesSpider(scrapy.Spider):
         if len(infos) == 0:
             price = response.xpath(
                 ".//div[contains(@class, 'pdpPrice']//span[@class='value']//text())").extract()[0]
-            # ".//div[@class='jsx-2122863564 pdpPrice']//span[@class='value']//text()").extract()[0]
             price = round(float(price), 2)
             is_fbn = False
             ret = response.xpath(
                 ".//div[@class='jsx-2490358733 shippingEstimatorContainer']//div[contains(@class, 'container')]")
-            # ".//div[@class='jsx-2490358733 shippingEstimatorContainer']//div[@class='jsx-3304762718 container']")
             if len(ret) > 0:
                 is_fbn = True
             rating = 100
@@ -213,7 +233,6 @@ class QuotesSpider(scrapy.Spider):
                     else:
                         self.database.needToChangePrice(ean, price, gold_shop, variant_name)
                         out = "情况D " + out + "\t改价为[" + str(price) + "]"
-
             else:
                 least_price = 999999
                 for info in infos.values():

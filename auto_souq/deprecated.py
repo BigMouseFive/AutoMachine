@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from multiprocessing import freeze_support
 import os, sys
-from DataManager import DataManager
-from OperateProcess import OperateProcess
-from SpiderProcess import SpiderProcess
+from .DataManager import DataManager
+from .OperateProcess import OperateProcess
+from .SpiderProcess import SpiderProcess
 
 
 def pre_test(name):

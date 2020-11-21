@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
+import os
+import sys
 from multiprocessing import freeze_support
-import os, sys
-from DataManager import DataManager
-from OperateProcess import OperateProcess
-from SpiderProcess import SpiderProcess
+from auto_noon.DataManager import DataManager
+from auto_noon.OperateProcess import OperateProcess
+from auto_noon.SpiderProcess import SpiderProcess
 
 
 def pre_test(name):
@@ -35,10 +36,10 @@ if __name__ == '__main__':
         database = DataManager(name)
         database.handlerStatus()
 
-#
+
 # def skr(name):
 #     if __name__ == '__main__':
-#         # os.system("title AutoMacine " + name)
+#         os.system("title AutoMacine " + name)
 #         freeze_support()
 #         os.chdir(os.path.split(os.path.realpath(__file__))[0])
 #         pre_test(name)
@@ -50,7 +51,9 @@ if __name__ == '__main__':
 #             p.join()
 #             database = DataManager(name)
 #             database.handlerStatus()
+#         p1.join()
 #
 #
 # skr("BuyMore")
+# skr("DZ-store")
 

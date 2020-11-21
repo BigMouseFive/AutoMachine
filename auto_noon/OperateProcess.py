@@ -9,7 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from DataManager import DataManager
+from auto_noon.DataManager import DataManager
 
 CHROME_DRIVER_PATH = "../chromedriver.exe"
 
@@ -33,8 +33,8 @@ class OperateProcess(multiprocessing.Process):
     def exceptHandler(self, info):
         info = time.strftime("%Y-%m-%d %H:%M:%S") + "\n" + info
         print(info)
-        self.debug_file.write(info)
-        self.debug_file.flush()
+        # self.debug_file.write(info)
+        # self.debug_file.flush()
 
     def run(self):  # 固定用run方法，启动进程自动调用run方法
         self.database = DataManager(self.name)
@@ -65,11 +65,14 @@ class OperateProcess(multiprocessing.Process):
                 continue
 
     def LoginAccount(self):
+        printYellow("后台：登录账户1")
+        # todo dylan 测试临时屏蔽
         self.database.handlerStatus()
-        printYellow("后台：登录账户")
+        printYellow("后台：登录账户2")
         self.chrome.get('https://login.noon.partners/en/')
         try:
             account, password = self.database.getAccountAndPassword()
+            printYellow("获取账号：" + str(account))
             xpath = ".//div[@class='jsx-1240009043 group']"
             WebDriverWait(self.chrome, 30, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
             elemLogin = self.chrome.find_elements_by_xpath(".//div[@class='jsx-1240009043 group']/input")
@@ -89,7 +92,7 @@ class OperateProcess(multiprocessing.Process):
             compare = "https://core.noon.partners/en-sa/"
         elif shop_type == "uae":
             compare = "https://core.noon.partners/en-ae/"
-
+        print("账号类型：" + shop_type)
         while self.chrome.current_url != compare:
             time.sleep(1)
             i = i + 1
@@ -97,7 +100,9 @@ class OperateProcess(multiprocessing.Process):
                 raise TimeoutError
         while 1:
             try:
+                # todo dylan 测试预约fbn功能，临时屏蔽原有改价函数
                 self.NewInventory()
+                # self.ScheduleFBN()
             except:
                 # self.exceptHandler(traceback.format_exc())
                 raise
@@ -242,15 +247,7 @@ class OperateProcess(multiprocessing.Process):
             self.database.finishOneChangeItem(ean, price, variant_name)
 
     def OperateProductSelenium(self):
-        item_sku_xpath = ".//div[@class='jsx-448933760 ctr']/table/tbody/tr[1]/td[1]//a"
-        shop_type = self.database.getShopType()
-        if shop_type == "ksa":
-            shop_type = "sa"
-        elif shop_type == "uae":
-            shop_type = "ae"
-        global product_url, elemProduct, debug_out
         printYellow("后台：开始改价")
-        url_bak = ""
         while True:
             self.database.handlerStatus()
             # time.sleep(1)
@@ -260,115 +257,88 @@ class OperateProcess(multiprocessing.Process):
                 continue
             out = time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + "[" + variant_name + "]\t" + str(round(price, 2))
             self.chrome.switch_to.window(self.inventoryHandler)
+            catelog_url_elems = []
             try:
-                xpath = './/div[@class="jsx-3807287210 searchWrapper"]'
-                WebDriverWait(self.chrome, 120, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                elemSearch = self.chrome.find_element_by_xpath('.//div[@class="jsx-3807287210 searchWrapper"]//input')
+                search_xpath = '//input[@type="search"]'
+                WebDriverWait(self.chrome, 100, 0.5).until(EC.presence_of_element_located((By.XPATH, search_xpath)))
+                elemSearch = self.chrome.find_element_by_xpath(search_xpath)
                 elemSearch.clear()
-                self.chrome.execute_script("arguments[0].value='" + ean + "';", elemSearch)
-                elemSearch.send_keys(" ")
-
-                debug_out = ""
-                while 1:
-                    time.sleep(1.5)
-                    # WebDriverWait(self.chrome, 10, 0.5).until(self.checkPage)
-                    e1 = self.chrome.find_elements_by_xpath(item_sku_xpath)
-                    e2 = self.chrome.find_elements_by_xpath("//table/tbody/tr//div[@class='jsx-3793681198 text']")
-                    if not (len(e1) == 1 or len(e2) == 1):
+                elemSearch.send_keys(ean[0:-1])
+                elemSearch.send_keys(Keys.ENTER)
+                limit = 2
+                while limit:
+                    time.sleep(1)
+                    # 判断是否还在搜索中
+                    please_wait_elems = self.chrome.find_elements_by_xpath("//div[contains(text(), 'Please wait')]")
+                    if len(please_wait_elems) == 1:
                         continue
-                    debug_out += "1"
-                    elemProducts = self.chrome.find_elements_by_xpath(".//div[@class='jsx-448933760 ctr']/table/tbody/tr")
-                    if len(elemProducts) >= 1:
-                        debug_out += "2"
-                        if len(e2) == 1:
-                            debug_out += "a"
-                            product_url = ""
-                            url_bak = ""
-                            break
-                        elemProduct = self.chrome.find_elements_by_xpath(
-                            ".//table[@class='jsx-3498568516 table']//td[@class='jsx-3498568516 td']"
-                            "//div[@class='jsx-3793681198 text']")
-                        if len(elemProduct) == 1:
-                            debug_out += "3"
-                            product_url = ""
-                            url_bak = ""
-                            break
-                        if len(elemProducts) == 1:
-                            debug_out += "4"
-                            elemProduct = self.chrome.find_elements_by_xpath(item_sku_xpath)
-                            product_url = str(elemProduct[0].text)
-                            if product_url != url_bak:
-                                debug_out += "5"
-                                url_bak = product_url
+
+                    # 判断是否搜索出结果
+                    no_data_elems = self.chrome.find_elements_by_xpath("//div[contains(text(), 'No Summary data')]")
+                    if no_data_elems:
+                        break
+
+                    # 获取搜索结果的第一个产品的ean 判断是否和搜索内容一致
+                    tr_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]")
+                    if len(tr_elems) != 0:
+                        # headless 模式下 显示ean的td元素被隐藏，需要点击第一个td去展开
+                        arrow_ctr_elem = tr_elems[0].find_elements_by_xpath(".//td[contains(@class, 'tableArrowCtr')]")
+                        if len(arrow_ctr_elem) == 1:
+                            arrow_ctr_elem[0].click()
+                            catalog_xpath = "//td[contains(text(), 'Catalog SKU')]/../td[2]"
+                            catalog_td_elems = []
+                            try:
+                                WebDriverWait(self.chrome, 1, 0.1).until(EC.presence_of_element_located((By.XPATH, catalog_xpath)))
+                                catalog_td_elems = arrow_ctr_elem[0].find_elements_by_xpath(catalog_xpath)
+                            except:
+                                pass
+                            if len(catalog_td_elems) == 1 and len(catalog_td_elems[0].text) > 1 and str(catalog_td_elems[0].text)[0:-1] == ean[0:-1]:
+                                catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[3]//a")
                                 break
-                        elif len(elemProducts) < 1 or len(elemProducts) > 13:
-                            elemSearch.send_keys(" ")
-                            continue
+                            else:
+                                limit -= 1
                         else:
-                            debug_out += "6"
-                            e1 = self.chrome.find_elements_by_xpath(item_sku_xpath)
-                            if not len(e1) == 1:
-                                debug_out += "$"
-                                continue
-                            if variant_name == "":
-                                debug_out += "7"
-                                product_url = ""
-                                url_bak = ""
-                                break
-                            for elemProduct in elemProducts:
-                                debug_out += "8"
-                                key = elemProduct.find_elements_by_xpath(".//div[text()='Variant']")
-                                if len(key) == 1:
-                                    value = key[0].find_elements_by_xpath("./following-sibling::div[1]")
-                                    debug_out += "9" + value[0].text
-                                    if len(value[0].text) > 0 and len(value) == 1 and value[0].text[0] == variant_name[0] and value[0].text in variant_name:
-                                        elemProduct = elemProduct.find_elements_by_xpath("./td[1]//a")  # change when item_sku_xpath change
-                                        debug_out += "0"
-                                        if len(elemProduct) == 1:
-                                            debug_out += "|"
-                                            product_url = str(elemProduct[0].text)
-                                            if product_url != url_bak:
-                                                debug_out += "!"
-                                                url_bak = product_url
-                                                raise FileExistsError
-                            debug_out += "#"
-                            product_url = ""
-                            url_bak = ""
-                            break
+                            td_elems = tr_elems[0].find_elements_by_xpath(".//td")
+                            for td_elem in td_elems:
+                                if len(td_elem.text) >= 1 and str(td_elem.text)[0:-1] == ean[0:-1]:
+                                    catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[2]//a")
+                                    break
+                                else:
+                                    limit -= 1
+                    else:
+                        limit -= 1
             except FileExistsError:
                 a = 1
             except:
                 raise
-            if product_url == "" or len(elemProduct) != 1:
+            if len(catelog_url_elems) != 1:
                 printRed("后台：" + out + "\t没找到这个产品")
-                # printRed("\n\n" + debug_out + "\n\n")
                 self.database.finishOneChangeItem(ean, price, variant_name)
                 continue
-            self.chrome.execute_script("arguments[0].click()", elemProduct[0])
-            # self.chrome.switch_to.window(self.loginHandler)
-            # js = 'window.location.replace("' + product_url + '")'
-            # self.chrome.execute_script(js)
+
+            self.chrome.execute_script("arguments[0].click()", catelog_url_elems[0])
 
             change_count, flag = self.database.isLowerThanMaxTimes(ean, variant_name)
             if flag:
                 try:
-                    xpath = ".//div[@class='jsx-3185603393 priceInputWrapper']//input[@name='sale_price_" + shop_type + "']"
-                    WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                    elemInput = self.chrome.find_element_by_xpath(xpath)
+                    sale_price_xpath = "//input[@name='sale_price']"
+                    WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, sale_price_xpath)))
+                    elemInput = self.chrome.find_element_by_xpath(sale_price_xpath)
                     value = elemInput.get_attribute("value")
                     if value is None or value == "value" or len(value) == 0:
-                        xpath = ".//div[@class='jsx-3185603393 priceInputWrapper']//input[@name='price_" + shop_type + "']"
-                        elemInput = self.chrome.find_element_by_xpath(xpath)
+                        price_xpath = "//input[@name='price']"
+                        elemInput = self.chrome.find_element_by_xpath(price_xpath)
                     old_price = round(float(elemInput.get_attribute("value")), 2)
                     elemInput.clear()
                     elemInput.send_keys(Keys.CONTROL, "a")
                     elemInput.send_keys(Keys.DELETE)
                     elemInput.send_keys(str(price))
-                    xpath = ".//div[@class='jsx-3185603393 fixedBottom']/button"
-                    WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                    elemBtn = self.chrome.find_element_by_xpath(xpath)
+                    save_button_xpath = "//div[contains(text(), 'Submit')]" # Save Changes
+                    WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, save_button_xpath)))
+                    elemBtn = self.chrome.find_element_by_xpath(save_button_xpath)
                     time_change = time.strftime("%Y-%m-%d %H:%M:%S")
                     self.chrome.execute_script("arguments[0].click()", elemBtn)
+                    time.sleep(0.5)
                     self.database.addAChange(ean, variant_name, old_price, price)
                     self.database.addChangeRecord(ean, variant_name, time_change, price)
                     out += "[" + str(change_count + 1) + "次]"
@@ -383,6 +353,49 @@ class OperateProcess(multiprocessing.Process):
             self.database.finishOneChangeItem(ean, price, variant_name)
             self.chrome.back()
 
+    def ScheduleFBN(self):
+        printYellow("后台：打开预约界面")
+        self.loginHandler = self.chrome.current_window_handle
+        handlers = self.chrome.window_handles
+        self.unknownHandler = ""
+        for handler in handlers:
+            if handler != self.loginHandler:
+                self.unknownHandler = handler
+                break
+        js = ""
+        shop_type = self.database.getShopType()
+        if shop_type == "ksa":
+            js = 'window.open("https://warehouse.noon.partners/en-sa/transfers?status=1&type=2&zone=all")'
+        elif shop_type == "uae":
+            js = 'window.open("https://warehouse.noon.partners/en-ae/transfers?status=1&type=2&zone=all")'
+        self.chrome.execute_script(js)
+        handlers = self.chrome.window_handles
+        for handler in handlers:
+            if handler != self.loginHandler and handler != self.unknownHandler:
+                self.inventoryHandler = handler
+                break
+        while 1:
+            try:
+                self.ChooseOpenItem()
+            except:
+                self.exceptHandler(traceback.format_exc())
+                self.chrome.refresh()
+                continue
+
+    def ChooseOpenItem(self):
+        print("后台：打开预约界面成功")
+        WebDriverWait(self.chrome, 120, 0.5).until(EC.presence_of_element_located((By.XPATH, ".//div[@class='jsx-2800349317 ctr']")))
+        print("后台：选择Open项目")
+        items = self.chrome.find_elements_by_xpath(".//table/tbody/tr")
+        print("items size:" + str(len(items)))
+        for item in items:
+            status_div = item.find_element_by_xpath("./td[@data-label='Status']/div")
+            if open in status_div.get_attribute("div"):
+                asn_button = item.find_element_by_xpath("./td[@data-label='Shipment Number']/button")
+                self.chrome.execute_script("arguments[0].click()", asn_button)
+                while True:
+                    time.sleep(1)
+
     def checkPage(self, driver):
         checkPageFinishScript = "try {if (document.readyState !== 'complete') {return false;} if (window.jQuery) { if (" \
                                 "window.jQuery.active) { return false; } else if (window.jQuery.ajax && " \
@@ -395,6 +408,7 @@ class OperateProcess(multiprocessing.Process):
                                 "$timeout(function() { window.qa.doneRendering = true;}, 0); return false;}} return " \
                                 "true;} catch (ex) {return false;} "
         return driver.execute_script(checkPageFinishScript)
+
 
 
 # timeout 357 367 385 137 270
