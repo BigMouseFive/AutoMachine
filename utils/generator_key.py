@@ -3,7 +3,7 @@ import time
 
 def generator(code, day, total):
     seconds = day * 3600 * 24
-    nowtime = time.time() + 2208988800
+    nowtime = time.time() + 2208988800 # old version 2208888800
     endtime = int(nowtime) + seconds - 1996111725
     endTime = ""
     for i in range(10):
