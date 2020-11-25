@@ -81,7 +81,9 @@ class QuotesSpider(scrapy.Spider):
             if self.handler == "parseHandler_a":
                 uri = "https://www.noon.com" + str(quote.xpath(".//a[contains(@class, 'product')]/@href").extract()[0])
             elif self.handler == "parseHandler_b" or self.handler == "parseHandler_c":
-                uri = "https://www.noon.com/_svc/catalog/api/u/" + str(quote.xpath(".//a[contains(@class, 'product')]/@href").extract()[0])
+                uri = "https://www.noon.com/_svc/catalog/api/u/"
+                uri += str(quote.xpath("./a/@href").extract()[0]) + "/product/"
+                uri += str(quote.xpath("./a/@id").extract()[0].split("-")[-1]) + "/p"
             if uri is not None:
                 uri = uri.split('?')[0]
                 if self.handler == "parseHandler_a":
