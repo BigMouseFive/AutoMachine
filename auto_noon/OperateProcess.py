@@ -44,6 +44,7 @@ class OperateProcess(multiprocessing.Process):
             option.add_argument('--no-sandbox')
             option.add_argument('--disable-dev-shm-usage')
             option.add_argument("headless")
+            option.add_argument("--window-size=1920,1050")
             option.add_argument('ignore-certificate-errors')
             option.add_argument('log-level=3')
             option.add_argument('lang=zh_CN.UTF-8')
@@ -55,7 +56,7 @@ class OperateProcess(multiprocessing.Process):
             }
             option.add_experimental_option('prefs', prefs)
             self.chrome = webdriver.Chrome(executable_path=CHROME_DRIVER_PATH, chrome_options=option)
-            self.chrome.maximize_window()
+            # self.chrome.maximize_window()
             try:
                 self.LoginAccount()
             except:
@@ -283,29 +284,36 @@ class OperateProcess(multiprocessing.Process):
                     tr_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]")
                     if len(tr_elems) != 0:
                         # headless 模式下 显示ean的td元素被隐藏，需要点击第一个td去展开
-                        arrow_ctr_elem = tr_elems[0].find_elements_by_xpath(".//td[contains(@class, 'tableArrowCtr')]")
-                        if len(arrow_ctr_elem) == 1:
-                            arrow_ctr_elem[0].click()
-                            catalog_xpath = "//td[contains(text(), 'Catalog SKU')]/../td[2]"
-                            catalog_td_elems = []
-                            try:
-                                WebDriverWait(self.chrome, 1, 0.1).until(EC.presence_of_element_located((By.XPATH, catalog_xpath)))
-                                catalog_td_elems = arrow_ctr_elem[0].find_elements_by_xpath(catalog_xpath)
-                            except:
-                                pass
-                            if len(catalog_td_elems) == 1 and len(catalog_td_elems[0].text) > 1 and str(catalog_td_elems[0].text)[0:-1] == ean[0:-1]:
-                                catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[3]//a")
+                        # arrow_ctr_elem = tr_elems[0].find_elements_by_xpath(".//td[contains(@class, 'tableArrowCtr')]")
+                        # if len(arrow_ctr_elem) == 1:
+                        #     try:
+                        #         arrow_ctr_elem[0].click()
+                        #     except:
+                        #         time.sleep(1000)
+                        #     catalog_xpath = "//td[contains(text(), 'Catalog SKU')]/../td[2]"
+                        #     catalog_td_elems = []
+                            # try:
+                            #     WebDriverWait(self.chrome, 1, 0.1).until(EC.presence_of_element_located((By.XPATH, catalog_xpath)))
+                            #     catalog_td_elems = arrow_ctr_elem[0].find_elements_by_xpath(catalog_xpath)
+                            # except:
+                            #     pass
+                        #     if len(catalog_td_elems) == 1 and len(catalog_td_elems[0].text) > 1 and str(catalog_td_elems[0].text)[0:-1] == ean[0:-1]:
+                        #         catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[3]//a")
+                        #         break
+                        #     else:
+                        #         limit -= 1
+                        # else:
+                        td_elems = tr_elems[0].find_elements_by_xpath(".//td")
+                        has_find = False
+                        for td_elem in td_elems:
+                            if len(td_elem.text) >= 1 and str(td_elem.text)[0:-1] == ean[0:-1]:
+                                catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[2]//a")
+                                has_find = True
                                 break
-                            else:
-                                limit -= 1
+                        if has_find:
+                            limit = 0
                         else:
-                            td_elems = tr_elems[0].find_elements_by_xpath(".//td")
-                            for td_elem in td_elems:
-                                if len(td_elem.text) >= 1 and str(td_elem.text)[0:-1] == ean[0:-1]:
-                                    catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[2]//a")
-                                    break
-                                else:
-                                    limit -= 1
+                            limit -= 1
                     else:
                         limit -= 1
             except FileExistsError:
