@@ -137,7 +137,7 @@ class OperateProcess(multiprocessing.Process):
             try:
                 self.OperateProductSelenium()
             except:
-                self.exceptHandler(traceback.format_exc())
+                # self.exceptHandler(traceback.format_exc())
                 self.chrome.refresh()
                 continue
 
@@ -247,6 +247,7 @@ class OperateProcess(multiprocessing.Process):
             self.database.finishOneChangeItem(ean, price, variant_name)
 
     def OperateProductSelenium(self):
+        error_count = 0
         printYellow("后台：开始改价")
         while True:
             self.database.handlerStatus()
@@ -310,9 +311,13 @@ class OperateProcess(multiprocessing.Process):
             except FileExistsError:
                 a = 1
             except:
-                raise
+                error_count += 1
+                if error_count > 3:
+                    raise
+                else:
+                    continue
             if len(catelog_url_elems) != 1:
-                printRed("后台：" + out + "\t没找到这个产品")
+                # printRed("后台：" + out + "\t没找到这个产品")
                 self.database.finishOneChangeItem(ean, price, variant_name)
                 continue
 
