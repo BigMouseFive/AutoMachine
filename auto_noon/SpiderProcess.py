@@ -95,7 +95,7 @@ class QuotesSpider(scrapy.Spider):
 
         # 获取下一页的url, （DEL::如果没有就从头开始）
         value = str(response.xpath(
-            ".//div[contains(@class, 'paginationWrapper')]//a[@class='nextLink']/@aria-disabled").extract()[0])
+            "//li[contains(@class, 'next')]//a[@class='arrowLink']/@aria-disabled").extract()[0])
         if value is not None and value == "false":
             self.page_index = self.page_index + 1
             if self.page_index > 50:
