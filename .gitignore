@@ -12,3 +12,4 @@ weibo_keywords
 weibo_keywords/chromedriver.exe
 weibo_keywords/main.py
 weibo_keywords/spider.py
+pak_installer/pak_installer_weibo.bat
