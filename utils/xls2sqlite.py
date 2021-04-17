@@ -199,7 +199,7 @@ class S2X:
 #     # os.system("pause")
 #     exit(-1)
 
-# a = X2S("C:/Users/79054/Desktop/record.xls", "D:/Utils/AutoMachine/VisualStudio2013WorkPlatform/lemon01/x64/Debug/DataBase.db")
-# a.addWhiteList("BuyMore")
-a = S2X("Buymore.ggc", "C:/Users/79054/Desktop/record.xls")
-a.exportGoldCar()
+a = X2S("C:\\Users\\戴锐\\Documents\\WeChat Files\\wxid_hkp6mvoroy6z22\\FileStorage\\File\\2021-01\白名单.xlsx", "C:\\D\\Github\\AutoMachine\\windows.storage")
+a.addWhiteList("BuyMore")
+# a = S2X("Buymore.ggc", "C:/Users/79054/Desktop/record.xls")
+# a.exportGoldCar()

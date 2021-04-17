@@ -66,6 +66,7 @@ class DataManager:
 
     def isLowerThanMaxTimes(self, ean, variant_name):
         count = 0
+        flag = True
         attr = self.getAttr2(ean)
         self.lock.acquire()
         conn = sqlite3.connect(self.name + ".ggc")
@@ -73,11 +74,11 @@ class DataManager:
         if len(ret) > 0:
             count = ret[0][0]
         if count >= attr["max_times"]:
-            return count, False
+            flag = False
         conn.commit()
         conn.close()
         self.lock.release()
-        return count, True
+        return count, flag
 
     def addAChange(self, ean, variant_name, old_price, price):
         self.lock.acquire()

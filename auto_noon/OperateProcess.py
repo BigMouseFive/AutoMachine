@@ -267,12 +267,13 @@ class OperateProcess(multiprocessing.Process):
                 elemSearch.clear()
                 elemSearch.send_keys(ean[0:-1])
                 elemSearch.send_keys(Keys.ENTER)
-                limit = 2
+                limit = 4
                 while limit:
                     time.sleep(1)
                     # 判断是否还在搜索中
                     please_wait_elems = self.chrome.find_elements_by_xpath("//div[contains(text(), 'Please wait')]")
                     if len(please_wait_elems) == 1:
+                        limit -= 1
                         continue
 
                     # 判断是否搜索出结果
@@ -283,31 +284,17 @@ class OperateProcess(multiprocessing.Process):
                     # 获取搜索结果的第一个产品的ean 判断是否和搜索内容一致
                     tr_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]")
                     if len(tr_elems) != 0:
-                        # headless 模式下 显示ean的td元素被隐藏，需要点击第一个td去展开
-                        # arrow_ctr_elem = tr_elems[0].find_elements_by_xpath(".//td[contains(@class, 'tableArrowCtr')]")
-                        # if len(arrow_ctr_elem) == 1:
-                        #     try:
-                        #         arrow_ctr_elem[0].click()
-                        #     except:
-                        #         time.sleep(1000)
-                        #     catalog_xpath = "//td[contains(text(), 'Catalog SKU')]/../td[2]"
-                        #     catalog_td_elems = []
-                            # try:
-                            #     WebDriverWait(self.chrome, 1, 0.1).until(EC.presence_of_element_located((By.XPATH, catalog_xpath)))
-                            #     catalog_td_elems = arrow_ctr_elem[0].find_elements_by_xpath(catalog_xpath)
-                            # except:
-                            #     pass
-                        #     if len(catalog_td_elems) == 1 and len(catalog_td_elems[0].text) > 1 and str(catalog_td_elems[0].text)[0:-1] == ean[0:-1]:
-                        #         catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[3]//a")
-                        #         break
-                        #     else:
-                        #         limit -= 1
-                        # else:
                         td_elems = tr_elems[0].find_elements_by_xpath(".//td")
                         has_find = False
                         for td_elem in td_elems:
                             if len(td_elem.text) >= 1 and str(td_elem.text)[0:-1] == ean[0:-1]:
                                 catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[2]//a")
+                                if len(catelog_url_elems) == 0:
+                                    catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[3]//a")
+                                if len(catelog_url_elems) == 0:
+                                    catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[1]//a")
+                                if len(catelog_url_elems) == 0:
+                                    catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[4]//a")
                                 has_find = True
                                 break
                         if has_find:
@@ -316,9 +303,8 @@ class OperateProcess(multiprocessing.Process):
                             limit -= 1
                     else:
                         limit -= 1
-            except FileExistsError:
-                a = 1
             except:
+                printRed(traceback.print_exc())
                 error_count += 1
                 if error_count > 3:
                     raise
@@ -329,12 +315,11 @@ class OperateProcess(multiprocessing.Process):
                 self.database.finishOneChangeItem(ean, price, variant_name)
                 continue
 
-            self.chrome.execute_script("arguments[0].click()", catelog_url_elems[0])
-
             change_count, flag = self.database.isLowerThanMaxTimes(ean, variant_name)
             if flag:
+                self.chrome.execute_script("arguments[0].click()", catelog_url_elems[0])
                 try:
-                    sale_price_xpath = "//input[@name='sale_price']"
+                    sale_price_xpath = "//input[@name='salePrice']"
                     WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, sale_price_xpath)))
                     elemInput = self.chrome.find_element_by_xpath(sale_price_xpath)
                     value = elemInput.get_attribute("value")
@@ -346,12 +331,21 @@ class OperateProcess(multiprocessing.Process):
                     elemInput.send_keys(Keys.CONTROL, "a")
                     elemInput.send_keys(Keys.DELETE)
                     elemInput.send_keys(str(price))
-                    save_button_xpath = "//div[contains(text(), 'Submit')]" # Save Changes
-                    WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, save_button_xpath)))
-                    elemBtn = self.chrome.find_element_by_xpath(save_button_xpath)
-                    time_change = time.strftime("%Y-%m-%d %H:%M:%S")
+
+                    # save_button_xpath = "//div[contains(text(), 'Save Changes')]"  # Submit
+                    # WebDriverWait(self.chrome, 20, 0.5).until(EC.presence_of_element_located((By.XPATH, save_button_xpath)))
+                    # elemBtn = self.chrome.find_element_by_xpath(save_button_xpath)
+                    # self.chrome.execute_script("arguments[0].click()", elemBtn)
+                    # time.sleep(0.5)
+
+                    submit_button_xpath = "//div[contains(text(), 'Submit')]"
+                    WebDriverWait(self.chrome, 20, 0.5).until(
+                        EC.presence_of_element_located((By.XPATH, submit_button_xpath)))
+                    elemBtn = self.chrome.find_elements_by_xpath(submit_button_xpath)[-1]
                     self.chrome.execute_script("arguments[0].click()", elemBtn)
                     time.sleep(0.5)
+
+                    time_change = time.strftime("%Y-%m-%d %H:%M:%S")
                     self.database.addAChange(ean, variant_name, old_price, price)
                     self.database.addChangeRecord(ean, variant_name, time_change, price)
                     out += "[" + str(change_count + 1) + "次]"
@@ -363,8 +357,11 @@ class OperateProcess(multiprocessing.Process):
             else:
                 out += "[" + str(change_count) + "次]"
                 printRed("后台：" + out + "\t达到最大改价次数")
+
             self.database.finishOneChangeItem(ean, price, variant_name)
-            self.chrome.back()
+            if flag:
+                self.chrome.back()
+                self.chrome.back()
 
     def ScheduleFBN(self):
         printYellow("后台：打开预约界面")

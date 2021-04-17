@@ -8,4 +8,7 @@ pak_installer/build
 *.spec
 *.ggc
 *.ggc-journal
-
+weibo_keywords
+weibo_keywords/chromedriver.exe
+weibo_keywords/main.py
+weibo_keywords/spider.py
