@@ -131,3 +131,4 @@ print(generator("ABR9ICP6SG977Q7K94GS", 41, 2))  # 苘子 2021-03-31
 print(generator("YBCDIMYBMPCZJPBM6AXI", 30, 1))  # Bruce 2021-03-24
 print(generator("8G695SPF8TBSG2JUBCPC", 30, 1))  # noon卖家 will介绍 2021-04-02
 print(generator("8AIBHAM6AE2JJZ7ND6MQ", 62, 2))  # tina 2021-04-19
+print(generator("GAC7HAR60JCJJP7LB4AE", 62, 2))  # tina 2021-04-19 替换电脑
