@@ -135,3 +135,4 @@ print(generator("GAC7HAR60JCJJP7LB4AE", 62, 2))  # tina 2021-04-19 替换电脑
 print(generator("BMYCCEHJ9E9AEGFOC924", 60, 1))  # nancy 2021-04-20  第一次使用时间2020-06-20
 print(generator("YBCDIMYBMPCZJPBM6AXI", 90, 1))  # Bruce 2021-04-24
 print(generator("8G695SPF8TBSG2JUBCPC", 30, 1))  # noon卖家 will介绍 2021-05-08
+print(generator("ABR9ICP6SG977Q7K94GS", 90, 2))  # 苘子 2021-05-10
