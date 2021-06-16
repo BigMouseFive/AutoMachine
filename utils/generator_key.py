@@ -138,3 +138,4 @@ print(generator("8G695SPF8TBSG2JUBCPC", 30, 1))  # noon卖家 will介绍 2021-05
 print(generator("BD8D40DADIED958B61WE", 31, 1))  # bruce 82.156.102.232 2021-05-14
 print(generator("ABR9ICP6SG977Q7K94GS", 90, 2))  # 苘子 2021-05-10
 print(generator("0LICIQXDUOGDDB7P7EWC", 90, 1))  # 李秋生 2021-05-13
+print(generator("BD8D40DADIED958B61WE", 30, 1))  # Bruce 82.156.102.232 2021-06-16
