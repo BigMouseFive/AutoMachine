@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import traceback
+
 import xlrd
 import xlwt
 import os
@@ -96,6 +98,49 @@ class X2S:
         conn.commit()
         conn.close()
 
+    def addFollowItems(self, shop_name):
+        conn = sqlite3.connect(self.dst)
+        try:
+            sheet = self.xls.sheet_by_index(0)
+            count = 0
+            for i in range(0, sheet.nrows):
+                v1 = sheet.cell(i, 0).value
+                if v1 == "sku":
+                    continue
+                v2 = sheet.cell(i, 1).value
+                v3 = sheet.cell(i, 2).value
+                v4 = sheet.cell(i, 3).value
+                v5 = sheet.cell(i, 4).value
+                v6 = sheet.cell(i, 5).value
+                v7 = sheet.cell(i, 6).value
+                v8 = sheet.cell(i, 7).value
+                try:
+                    try:
+                        v3 = float(v3)
+                    except:
+                        v3 = 0
+                    try:
+                        v4 = float(v4)
+                    except:
+                        v4 = 0
+                    try:
+                        v6 = float(v6)
+                    except:
+                        v6 = 0
+                    conn.execute("REPLACE INTO 'follow_items'(shop,sku,psku,price,warehouse,stock,processing_time,barcode,warranty) VALUES (?,?,?,?,?,?,?,?,?,?);", (shop_name, v1, v2, v3, v4, v5, v6, v7, v8))
+                    count += 1
+                    print(str(count) + ":" + str(v1) + "," + str(v2) + "," + str(v3) + "," + str(v4) + "," + str(v5) + "," + str(v6) + "," + str(v7) + "," + str(v8))
+                except:
+                    print("表格内容错误，第" + str(i+1) + "行")
+                    traceback.print_exc()
+        except:
+            print("获取表格内容错误")
+            traceback.print_exc()
+            conn.close()
+            # os.system("pause")
+            exit(-1)
+        conn.commit()
+        conn.close()
 
 class S2X:
     def __init__(self, src, dst):
@@ -138,6 +183,7 @@ class S2X:
             self.xls.save(self.dst)
             print("导出到表格成功")
         except:
+            traceback.print_exc()
             print("导出到表格失败")
             # os.system("pause")
             exit(-1)
@@ -194,12 +240,17 @@ class S2X:
 #     elif method == "ChangePrice":
 #         s2x = S2X(sys.argv[2], sys.argv[3])
 #         s2x.exportChangePrice()
+#     elif method == "FollowItems":
+#         x2s = X2S(sys.argv[2], sys.argv[3])
+#         x2s.addFollowItems(sys.argv[4])
 # except:
 #     print("出现异常")
 #     # os.system("pause")
 #     exit(-1)
 
-a = X2S("C:\\Users\\戴锐\\Documents\\WeChat Files\\wxid_hkp6mvoroy6z22\\FileStorage\\File\\2021-01\白名单.xlsx", "C:\\D\\Github\\AutoMachine\\windows.storage")
-a.addWhiteList("BuyMore")
-# a = S2X("Buymore.ggc", "C:/Users/79054/Desktop/record.xls")
+# a = X2S("C:\\Users\\戴锐\\Documents\\WeChat Files\\wxid_hkp6mvoroy6z22\\FileStorage\\File\\2021-01\白名单.xlsx", "C:\\D\\Github\\AutoMachine\\windows.storage")
+# a.addWhiteList("BuyMore")
+# a = S2X("..\\auto_noon\\YYcom.ggc", "C:/Users/戴锐/Desktop/record.xls")
 # a.exportGoldCar()
+# a = X2S("C:\\Users\\戴锐\\Documents\\follow_items.xlsx", "C:\\D\\Github\\lemon01_follow\\x64\\Debug\\windows.storage")
+# a.addFollowItems("BuyMore")

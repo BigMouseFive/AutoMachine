@@ -116,7 +116,7 @@ def generator(code, day, total):
     return code
 
 
-print(generator("FIE56ED6XGDIIG7UI94W", 242, 1))  # 台式机
+print(generator("FIE56ED6XGDIIG7UI94W", 3666, 1))  # 台式机
 print(generator("HFAJI6NKNEG556GD5FO4", 242, 1))  # gg 61.153.184.9  2021-01-11
 print(generator("YFS5I61KCSA55NGD54IC", 366, 1))  # gg 115.220.1.39  2021-01-11
 print(generator("7EGKII165SDKK27XJDDA", 30, 1))  # 罗伍   2021-01/-12
@@ -138,4 +138,6 @@ print(generator("8G695SPF8TBSG2JUBCPC", 30, 1))  # noon卖家 will介绍 2021-05
 print(generator("BD8D40DADIED958B61WE", 31, 1))  # bruce 82.156.102.232 2021-05-14
 print(generator("ABR9ICP6SG977Q7K94GS", 90, 2))  # 苘子 2021-05-10
 print(generator("0LICIQXDUOGDDB7P7EWC", 90, 1))  # 李秋生 2021-05-13
+print(generator("2FJ7I6M5ED715D6E6294", 142, 1))  # gg 139.9.184.81  2021-01-21
+print(generator("LNJ79QL8XL3DH2F1J5CU", 90, 1))  # 友庆 2021-07-02
 print(generator("BD8D40DADIED958B61WE", 30, 1))  # Bruce 82.156.102.232 2021-06-16

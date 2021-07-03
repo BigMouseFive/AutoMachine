@@ -1,2 +1,2 @@
-pyinstaller -F ../xls2sqlite.py -i lemon.ico -n helper
+pyinstaller -F ../utils/xls2sqlite.py -i lemon.ico -n helper
 pause

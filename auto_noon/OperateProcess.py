@@ -93,8 +93,9 @@ class OperateProcess(multiprocessing.Process):
             compare = "https://core.noon.partners/en-sa/"
         elif shop_type == "uae":
             compare = "https://core.noon.partners/en-ae/"
+        compare = "https://core.noon.partners/en-"
         print("账号类型：" + shop_type)
-        while self.chrome.current_url != compare:
+        while compare in self.chrome.current_url:
             time.sleep(1)
             i = i + 1
             if i > 150:
