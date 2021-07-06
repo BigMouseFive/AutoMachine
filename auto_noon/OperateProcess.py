@@ -340,19 +340,18 @@ class OperateProcess(multiprocessing.Process):
                     # time.sleep(0.5)
 
                     # 点击按钮 Save Changes
-                    # save_changes_xpath = "//div[contains(text(), 'Save Changes')]"
-                    # WebDriverWait(self.chrome, 20, 0.5).until(
-                    #     EC.presence_of_element_located((By.XPATH, save_changes_xpath)))
-                    # elemBtn = self.chrome.find_elements_by_xpath(save_changes_xpath)[-1]
-                    # print(elemBtn.text)
-                    # self.chrome.execute_script("arguments[0].click()", elemBtn)
-                    # time.sleep(0.5)
+                    save_changes_xpath = "//div[contains(text(), 'Save Changes')]"
+                    WebDriverWait(self.chrome, 20, 0.5).until(
+                        EC.presence_of_element_located((By.XPATH, save_changes_xpath)))
+                    elemBtn = self.chrome.find_elements_by_xpath(save_changes_xpath)[-1]
+                    self.chrome.execute_script("arguments[0].click()", elemBtn)
+                    time.sleep(0.5)
 
                     # 点击按钮submit
                     submit_button_xpath = "//div[contains(text(), 'Submit')]"
                     WebDriverWait(self.chrome, 20, 0.5).until(
                         EC.presence_of_element_located((By.XPATH, submit_button_xpath)))
-                    elemBtn = self.chrome.find_elements_by_xpath(submit_button_xpath)[1]
+                    elemBtn = self.chrome.find_elements_by_xpath(submit_button_xpath)[0]
                     self.chrome.execute_script("arguments[0].click()", elemBtn)
                     time.sleep(0.5)
 
