@@ -5,14 +5,14 @@ import time
 def generator(code, day, total):
     seconds = day * 3600 * 24
     nowtime = time.time() + 2208988800  # old version 2208888800 new version 2208988800
-    endtime = int(nowtime) + seconds - 1996111725
-    endTime = ""
+    end_time_one = int(nowtime) + seconds - 1996111725
+    end_time = ""
     for i in range(10):
-        part = int(endtime % 10)
-        endTime = str(part) + endTime
-        endtime /= 10
-    endTime += str(int(total / 10))
-    endTime += str(int(total % 10))
+        part = int(end_time_one % 10)
+        end_time = str(part) + end_time
+        end_time_one /= 10
+    end_time += str(int(total / 10))
+    end_time += str(int(total % 10))
 
     decode = []
     for c in code:
@@ -72,39 +72,39 @@ def generator(code, day, total):
     decode[16] += 2
     decode[10] += 5
 
-    decode[2] = int(endTime[4]) * 3
-    decode[0] = int(endTime[5]) * 2 + 3
-    decode[31] = int(endTime[6])
-    decode[26] = int(endTime[7]) * 2 + 4
-    decode[25] = int(endTime[1]) * 2 + int(endTime[7])
-    decode[15] = int(endTime[8]) + 4
-    decode[20] = int(endTime[3]) * 2 + int(endTime[8])
-    decode[28] = int(endTime[9]) + 7
-    decode[23] = int(endTime[2]) + int(endTime[9])
-    decode[11] = int(endTime[10]) + int(endTime[5])
-    decode[6] = int(endTime[11]) * 2 + 2
-    decode[29] = int(endTime[0]) + int(endTime[3]) + int(endTime[11])
+    decode[2] = int(end_time[4]) * 3
+    decode[0] = int(end_time[5]) * 2 + 3
+    decode[31] = int(end_time[6])
+    decode[26] = int(end_time[7]) * 2 + 4
+    decode[25] = int(end_time[1]) * 2 + int(end_time[7])
+    decode[15] = int(end_time[8]) + 4
+    decode[20] = int(end_time[3]) * 2 + int(end_time[8])
+    decode[28] = int(end_time[9]) + 7
+    decode[23] = int(end_time[2]) + int(end_time[9])
+    decode[11] = int(end_time[10]) + int(end_time[5])
+    decode[6] = int(end_time[11]) * 2 + 2
+    decode[29] = int(end_time[0]) + int(end_time[3]) + int(end_time[11])
 
-    decode[1] += int(endTime[5])
-    decode[3] += int(endTime[6])
-    decode[4] += int(endTime[7])
-    decode[5] += int(endTime[8])
-    decode[7] += int(endTime[9])
-    decode[8] += int(endTime[6])
-    decode[9] += int(endTime[7])
-    decode[10] += int(endTime[8])
-    decode[12] += int(endTime[8])
-    decode[13] += int(endTime[5])
-    decode[14] += int(endTime[7])
-    decode[16] += int(endTime[9])
-    decode[17] += int(endTime[7])
-    decode[18] += int(endTime[6])
-    decode[19] += int(endTime[6])
-    decode[21] += int(endTime[5])
-    decode[22] += int(endTime[8])
-    decode[24] += int(endTime[9])
-    decode[27] += int(endTime[7])
-    decode[30] += int(endTime[5])
+    decode[1] += int(end_time[5])
+    decode[3] += int(end_time[6])
+    decode[4] += int(end_time[7])
+    decode[5] += int(end_time[8])
+    decode[7] += int(end_time[9])
+    decode[8] += int(end_time[6])
+    decode[9] += int(end_time[7])
+    decode[10] += int(end_time[8])
+    decode[12] += int(end_time[8])
+    decode[13] += int(end_time[5])
+    decode[14] += int(end_time[7])
+    decode[16] += int(end_time[9])
+    decode[17] += int(end_time[7])
+    decode[18] += int(end_time[6])
+    decode[19] += int(end_time[6])
+    decode[21] += int(end_time[5])
+    decode[22] += int(end_time[8])
+    decode[24] += int(end_time[9])
+    decode[27] += int(end_time[7])
+    decode[30] += int(end_time[5])
 
     code = ""
     for v in decode:
@@ -114,6 +114,40 @@ def generator(code, day, total):
             c = ord('0') + v
         code += chr(c)
     return code
+
+
+def degenerator(register_code):
+    register_code_int = []
+    for i in range(len(register_code)):
+        if '9' >= register_code[i] >= '0':
+            register_code_int.append(ord(register_code[i]) - ord('0'))
+        elif 'Z' >= register_code[i] >= 'A':
+            register_code_int.append(ord(register_code[i]) - ord('A') + 10)
+        elif 'z' >= register_code[i] >= 'a':
+            register_code_int.append(ord(register_code[i]) - ord('a') + 10)
+    end_time = [0] * 32
+    end_time[4] = register_code_int[2] / 3
+    end_time[5] = (register_code_int[0] - 3) / 2
+    end_time[6] = register_code_int[31]
+    end_time[7] = (register_code_int[26] - 4) / 2
+    end_time[1] = (register_code_int[25] - end_time[7]) / 2
+    end_time[8] = register_code_int[15] - 4
+    end_time[3] = (register_code_int[20] - end_time[8]) / 2
+    end_time[9] = register_code_int[28] - 7
+    end_time[2] = register_code_int[23] - end_time[9]
+    end_time[10] = register_code_int[11] - end_time[5]
+    end_time[11] = (register_code_int[6] - 2) / 2
+    end_time[0] = register_code_int[29] - end_time[3] - end_time[11]
+    end_time_one = 0
+    for i in range(10):
+        end_time_one = end_time_one * 10 + end_time[i]
+    nowtime = time.time() + 2208988800
+    seconds = end_time_one - nowtime + 1996111725
+    days = seconds / 3600 / 24
+    total = 0
+    for i in range(10, 12):
+        total = total * 10 + end_time[i]
+    return int(round(days, 0)), int(seconds), int(total)
 
 
 print(generator("FIE56ED6XGDIIG7UI94W", 3666, 1))  # 台式机
@@ -137,7 +171,12 @@ print(generator("YBCDIMYBMPCZJPBM6AXI", 90, 1))  # Bruce 2021-04-24
 print(generator("8G695SPF8TBSG2JUBCPC", 30, 1))  # noon卖家 will介绍 2021-05-08
 print(generator("BD8D40DADIED958B61WE", 31, 1))  # bruce 82.156.102.232 2021-05-14
 print(generator("ABR9ICP6SG977Q7K94GS", 90, 2))  # 苘子 2021-05-10
-print(generator("0LICIQXDUOGDDB7P7EWC", 90, 1))  # 李秋生 2021-05-13
 print(generator("2FJ7I6M5ED715D6E6294", 142, 1))  # gg 139.9.184.81  2021-01-21
 print(generator("LNJ79QL8XL3DH2F1J5CU", 90, 1))  # 友庆 2021-07-02
 print(generator("BD8D40DADIED958B61WE", 30, 1))  # Bruce 82.156.102.232 2021-06-16
+print(generator("HCSJBEN65L87BCFPD1AU", 2, 1))  # 罗伍 2021-07-23
+print(generator("LNJ79QL8XL3DH2F1J5CU", 90, 1))  # 友庆 2021-07-02
+print(generator("DDEB40BANGGD9Z8C77Q8", 42, 1))  # gg 119.45.135.40 2021-08-01 替换61.153.184.9  2021-01-11
+print(generator("SDQ940HA2M8D9E8FAAKE", 166, 1))  # gg 119.45.135.122 2021-08-01 替换115.220.1.39  2021-01-11
+print(generator("VD5540HAHMDD9T894D8G", 207, 1))  # gg 119.45.116.129 2021-08-01 替换152.136.187.93  2021-02-20
+print(generator("0LICIQXDUOGDDB7P7EWC", 91, 1))  # 李秋生 2021-08-12

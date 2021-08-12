@@ -175,11 +175,41 @@ class S2X:
             sheet.write(0, 2, label="price")
             sheet.write(0, 3, label="shop")
 
-            for i in range(1, len(ret)):
+            for i in range(1, len(ret)+1):
                 sheet.write(i, 0, label=ret[i-1][0])
                 sheet.write(i, 1, label=ret[i-1][1])
                 sheet.write(i, 2, label=ret[i-1][2])
                 sheet.write(i, 3, label=ret[i-1][3])
+            self.xls.save(self.dst)
+            print("导出到表格成功")
+        except:
+            traceback.print_exc()
+            print("导出到表格失败")
+            # os.system("pause")
+            exit(-1)
+
+    def exportProductAttr(self, shop):
+        conn = sqlite3.connect(self.src)
+        ret = []
+        try:
+            ret = conn.execute("select ean, least_price, max_times from 'CPComplexAttr' where shop=?;", (shop,)).fetchall()
+        except:
+            conn.close()
+            print("获取店铺定制化参数失败")
+            # os.system("pause")
+            exit(-1)
+        conn.close()
+
+        try:
+            sheet = self.xls.add_sheet(shop)
+            sheet.write(0, 0, label="ean")
+            sheet.write(0, 1, label="least_price")
+            sheet.write(0, 2, label="max_times")
+
+            for i in range(1, len(ret)+1):
+                sheet.write(i, 0, label=ret[i - 1][0])
+                sheet.write(i, 1, label=ret[i - 1][1])
+                sheet.write(i, 2, label=ret[i - 1][2])
             self.xls.save(self.dst)
             print("导出到表格成功")
         except:
@@ -208,7 +238,7 @@ class S2X:
             sheet.write(0, 2, label="variant_name")
             sheet.write(0, 3, label="price")
 
-            for i in range(1, len(ret)):
+            for i in range(1, len(ret)+1):
                 sheet.write(i, 0, label=ret[i-1][0])
                 sheet.write(i, 1, label=ret[i-1][1])
                 sheet.write(i, 2, label=ret[i-1][2])
@@ -221,32 +251,35 @@ class S2X:
             exit(-1)
 
 
-# os.system("title AutoMachine Helper")
-# try:
-#     method = sys.argv[1]
-#     if method == "GoldCar":
-#         # 注意 xlwt 是以xls方式保存表格的 所以保存的文件名后缀得是xls
-#         s2x = S2X(sys.argv[2], sys.argv[3])
-#         s2x.exportGoldCar()
-#     elif method == "WhiteShop":
-#         x2s = X2S(sys.argv[2], sys.argv[3])
-#         x2s.addWhiteShop(sys.argv[4])
-#     elif method == "WhiteList":
-#         x2s = X2S(sys.argv[2], sys.argv[3])
-#         x2s.addWhiteList(sys.argv[4])
-#     elif method == "ProductAttr":
-#         x2s = X2S(sys.argv[2], sys.argv[3])
-#         x2s.addProductAttr(sys.argv[4])
-#     elif method == "ChangePrice":
-#         s2x = S2X(sys.argv[2], sys.argv[3])
-#         s2x.exportChangePrice()
-#     elif method == "FollowItems":
-#         x2s = X2S(sys.argv[2], sys.argv[3])
-#         x2s.addFollowItems(sys.argv[4])
-# except:
-#     print("出现异常")
-#     # os.system("pause")
-#     exit(-1)
+os.system("title AutoMachine Helper")
+try:
+    method = sys.argv[1]
+    if method == "GoldCar":
+        # 注意 xlwt 是以xls方式保存表格的 所以保存的文件名后缀得是xls
+        s2x = S2X(sys.argv[2], sys.argv[3])
+        s2x.exportGoldCar()
+    elif method == "WhiteShop":
+        x2s = X2S(sys.argv[2], sys.argv[3])
+        x2s.addWhiteShop(sys.argv[4])
+    elif method == "WhiteList":
+        x2s = X2S(sys.argv[2], sys.argv[3])
+        x2s.addWhiteList(sys.argv[4])
+    elif method == "ProductAttr":
+        x2s = X2S(sys.argv[2], sys.argv[3])
+        x2s.addProductAttr(sys.argv[4])
+    elif method == "ChangePrice":
+        s2x = S2X(sys.argv[2], sys.argv[3])
+        s2x.exportChangePrice()
+    elif method == "FollowItems":
+        x2s = X2S(sys.argv[2], sys.argv[3])
+        x2s.addFollowItems(sys.argv[4])
+    elif method == "ProductAttrExport":
+        s2x = S2X(sys.argv[2], sys.argv[3])
+        s2x.exportProductAttr(sys.argv[4])
+except:
+    print("出现异常")
+    # os.system("pause")
+    exit(-1)
 
 # a = X2S("C:\\Users\\戴锐\\Documents\\WeChat Files\\wxid_hkp6mvoroy6z22\\FileStorage\\File\\2021-01\白名单.xlsx", "C:\\D\\Github\\AutoMachine\\windows.storage")
 # a.addWhiteList("BuyMore")
