@@ -180,3 +180,7 @@ print(generator("DDEB40BANGGD9Z8C77Q8", 42, 1))  # gg 119.45.135.40 2021-08-01 �
 print(generator("SDQ940HA2M8D9E8FAAKE", 166, 1))  # gg 119.45.135.122 2021-08-01 替换115.220.1.39  2021-01-11
 print(generator("VD5540HAHMDD9T894D8G", 207, 1))  # gg 119.45.116.129 2021-08-01 替换152.136.187.93  2021-02-20
 print(generator("0LICIQXDUOGDDB7P7EWC", 91, 1))  # 李秋生 2021-08-12
+print(generator("WEIG52OBIS5IAB9MG26A", 365, 1))  # nancy 2021-10-16
+print(generator("PEFE52HBLLGIAA9LF90G", 365, 1))  # nancy 2021-10-16
+print(generator("2FJ7I6M5ED715D6E6294", 368, 1))  # gg 39.104.76.234 2021-10-30
+

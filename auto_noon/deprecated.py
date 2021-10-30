@@ -43,8 +43,8 @@ if __name__ == '__main__':
 #         freeze_support()
 #         os.chdir(os.path.split(os.path.realpath(__file__))[0])
 #         pre_test(name)
-#         # p1 = OperateProcess(name)
-#         # p1.start()
+#         p1 = OperateProcess(name)
+#         p1.start()
 #         while True:
 #             p = SpiderProcess(name=name)
 #             p.start()
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 #             database = DataManager(name)
 #             database.handlerStatus()
 #             database.handlerStatus()
-#         # p1.join()
+#         p1.join()
 
 
 # skr("BuyMore")
