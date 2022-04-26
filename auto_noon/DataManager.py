@@ -52,6 +52,11 @@ class DataManager:
                                                     time_change          TEXT   NOT NULL,
                                                     price         INT    NOT NULL,
                                                     primary key (time_change));''')
+        c.execute("DROP TABLE IF EXISTS 'page';")
+        c.execute('''CREATE TABLE 'page'
+                    (shop      TEXT    NOT NULL,
+                    page         INT    NOT NULL,
+                    primary key (shop));''')
         conn.commit()
         conn.close()
         self.lock.release()
@@ -137,7 +142,6 @@ class DataManager:
         #         attr["max_percent"] = ret[0][1]
         # except:
         #     raise
-
         # 具体某个产品的最低价
         try:
             ret = conn.execute("select max_times from 'CPComplexAttr' where ean=? and shop=?;", (ean, self.name)).fetchall()
@@ -154,7 +158,7 @@ class DataManager:
         url = []
         shop_type = self.getShopType()
         if shop_type == "ksa":
-                url = ["https://www.noon.com/saudi-en/"]
+            url = ["https://www.noon.com/saudi-en/"]
         elif shop_type == "uae":
             url = ["https://www.noon.com/uae-en/"]
 

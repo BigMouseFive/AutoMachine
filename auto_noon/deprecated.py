@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import threading
 from multiprocessing import freeze_support
 from auto_noon.DataManager import DataManager
 from auto_noon.OperateProcess import OperateProcess
 from auto_noon.SpiderProcess import SpiderProcess
+from logger import logger
 
 
 def pre_test(name):
@@ -13,6 +15,7 @@ def pre_test(name):
     db.initShopDataBase()
 
     # pre log.txt
+    logger.init()
     log_file = name + ".log"
     if os.path.exists(log_file):
         try:
@@ -28,13 +31,10 @@ if __name__ == '__main__':
     os.chdir(os.path.split(os.path.realpath(__file__))[0])
     pre_test(name)
     p1 = OperateProcess(name)
-    p1.start()
-    while True:
-        p = SpiderProcess(name=name)
-        p.start()
-        p.join()
-        database = DataManager(name)
-        database.handlerStatus()
+    pt1 = threading.Thread(target=p1.run)
+    pt1.start()
+    p = SpiderProcess(name=name)
+    p.run()
 
 
 # def skr(name):
@@ -44,15 +44,10 @@ if __name__ == '__main__':
 #         os.chdir(os.path.split(os.path.realpath(__file__))[0])
 #         pre_test(name)
 #         p1 = OperateProcess(name)
-#         p1.start()
-#         while True:
-#             p = SpiderProcess(name=name)
-#             p.start()
-#             p.join()
-#             database = DataManager(name)
-#             database.handlerStatus()
-#             database.handlerStatus()
-#         p1.join()
+#         pt1 = threading.Thread(target=p1.run)
+#         pt1.start()
+#         p = SpiderProcess(name=name)
+#         p.run()
 
 
 # skr("BuyMore")

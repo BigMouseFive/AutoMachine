@@ -51,6 +51,7 @@ import random
 import json
 import time
 from auto_noon.DataManager import DataManager
+from logger import logger
 
 
 class QuotesSpider(scrapy.Spider):
@@ -60,11 +61,17 @@ class QuotesSpider(scrapy.Spider):
         super(QuotesSpider, self).__init__(*args, **kwargs)
         self.database = DataManager(shop_name)
         self.shop_name = shop_name.lower()
-        self.start_urls = self.database.getScrapyUrl()
+        self.origin_start_urls = self.database.getScrapyUrl()
         self.page_index = 1
+        self.start_urls = []
+        try:
+            self.page_index = int(open(self.shop_name + "_page_size").read())
+        except:
+            pass
         self.handler = "parseHandler_b"
-        # out = "抓取数据：" + self.start_urls[0]
-        # print(out)
+        if len(self.origin_start_urls) > 0:
+            self.start_urls.append(self.origin_start_urls[0] + "&page=" + str(self.page_index))
+        logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
 
     def parse(self, response):
         shop_type = self.database.getShopType()
@@ -94,14 +101,45 @@ class QuotesSpider(scrapy.Spider):
                     yield response.follow(uri, headers=add_headers, callback=self.parseHandler_c)
 
         # 获取下一页的url, （DEL::如果没有就从头开始）
-        value = str(response.xpath(
-            "//li[contains(@class, 'next')]//a[@class='arrowLink']/@aria-disabled").extract()[0])
+        next_page_list = response.xpath(
+            "//li[contains(@class, 'next')]//a[@class='arrowLink']/@aria-disabled").extract()
+        if len(next_page_list) > 0:
+            value = str(next_page_list[0])
+        else:
+            value = None
         if value is not None and value == "false":
             self.page_index = self.page_index + 1
-            if self.page_index > 50:
+            if self.page_index <= 50:
+                with open(self.shop_name + "_page_size", "w") as f:
+                    f.write(str(self.page_index))
+                next_page = self.origin_start_urls[0] + "&page=" + str(self.page_index)
+                yield response.follow(next_page, callback=self.parse)
                 return
-            next_page = self.start_urls[0] + "&page=" + str(self.page_index)
-            yield response.follow(next_page, callback=self.parse)
+        with open(self.shop_name + "_page_size", "w") as f:
+            f.write(str(1))
+        logger.info("前台,抓取数据一轮完成")
+
+        # 等待
+        attr = self.database.getAttr("EMPTY")
+        count = 2
+        if attr["minute"] != 0:
+            count = attr["minute"] * 60
+        minute = 0
+        while minute <= count:
+            self.database.handlerStatus()
+            minute += 1
+            time.sleep(1)
+            attr = self.database.getAttr("EMPTY")
+            count = 2
+            if attr["minute"] != 0:
+                count = attr["minute"] * 60
+
+        # 重新开始
+        logger.info("前台,启动前台抓取任务")
+        self.page_index = 1
+        next_page = self.origin_start_urls[0] + "&page=" + str(self.page_index)
+        logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
+        yield response.follow(next_page, callback=self.parse)
 
     def parseHandler_a(self, response):
         infos, gold_shop = self.getAllPirce_a(response)  # 获取所有的价格并以此形式返回{shop_name:[price, rating, fullfilled], ...}
@@ -112,7 +150,7 @@ class QuotesSpider(scrapy.Spider):
 
     def parseHandler_b(self, response):
         if not response.text:
-            print("parseHandler_b: empty response")
+            logger.info("前台,parseHandler_b: empty response")
             return
         try:
             res_json = json.loads(response.text)
@@ -128,14 +166,14 @@ class QuotesSpider(scrapy.Spider):
                     if self.shop_name in infos:
                         self.solutionNoon(ean, infos, gold_shop, variant_name)
                 except ValueError:
-                    print("parseHandler_b: handler variant error: " + str(variant))
+                    logger.info("前台,parseHandler_b: handler variant error: " + str(variant))
         except ValueError:
-            print("parseHandler_b: handler json error")
+            logger.info("前台,parseHandler_b: handler json error")
             return
 
     def parseHandler_c(self, response):
         if not response.text:
-            print("parseHandler_c: empty response")
+            logger.info("前台,parseHandler_c: empty response")
             return
         try:
             res_json = json.loads(response.text)
@@ -152,9 +190,9 @@ class QuotesSpider(scrapy.Spider):
                 if specification["code"] == "model_name":
                     model_name = specification["value"]
 
-            print(sku + "," + str(model_name) + "," + str(model_number))
+            logger.info("前台," + sku + "," + str(model_name) + "," + str(model_number))
         except ValueError:
-            print("parseHandler_c: handler json error")
+            logger.info("前台,parseHandler_c: handler json error")
             return
 
     def getAllPirce_a(self, response):
@@ -191,7 +229,7 @@ class QuotesSpider(scrapy.Spider):
         infos = {}
         gold_shop = offers[0]["store_name"].lower()
         for offer in offers:
-            # print(offer)
+            # logger.info(offer)
             is_fbn = offer["is_fbn"] == 1
             rating = 0.99
             if "seller_score" in offer:
@@ -204,13 +242,13 @@ class QuotesSpider(scrapy.Spider):
 
     def solutionNoon(self, ean, infos, gold_shop, variant_name=""):
         if not self.database.isInWhiteList(ean, variant_name):
-            out = "前台：不在白名单 " + time.strftime("%Y-%m-%d %H:%M:%S") + "   " + ean + "[" + variant_name + "]\t本店铺[" + str(infos[self.shop_name][0]) + "]\t" + \
+            out = "前台,不在白名单 " + ean + "[" + variant_name + "]\t本店铺[" + str(infos[self.shop_name][0]) + "]\t" + \
               "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]"
-            print(out)
+            logger.info(out)
             return
 
         attr = self.database.getAttr(ean)
-        out = time.strftime("%Y-%m-%d %H:%M:%S") + "   " + ean + "[" + variant_name + "]\t本店铺[" + str(infos[self.shop_name][0]) + "]\t" + \
+        out = ean + "[" + variant_name + "]\t本店铺[" + str(infos[self.shop_name][0]) + "]\t" + \
               "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]"
         self.database.spiderRecord(ean, infos[gold_shop][0], gold_shop, variant_name)
         if gold_shop in attr["my_shop"]:  # 黄金购物车是自家店铺
@@ -224,14 +262,16 @@ class QuotesSpider(scrapy.Spider):
                     else:
                         price = round(min(infos[gold_shop][0], infos[self.shop_name][0]) - attr["lowwer"], 2)
                         if price < attr["self_least_price"]:
-                            out = "情况C " + out + "\t不修改"
+                            out = "情况C " + out + "\t差价比[" + str(round(diff1 * 100, 2)) + "%]\t改价为[" + str(attr["self_least_price"]) + "]"
+                            self.database.needToChangePrice(ean, attr["self_least_price"], gold_shop, variant_name)
                         else:
                             self.database.needToChangePrice(ean, price, gold_shop, variant_name)
                             out = "情况C " + out + "\t差价比[" + str(round(diff1 * 100, 2)) + "%]\t改价为[" + str(price) + "]"
                 else:
                     price = round(infos[self.shop_name][0] - attr["lowwer"], 2)
                     if price < max(infos[gold_shop][0], attr["self_least_price"]):
-                        out = "情况D " + out + "\t不修改"
+                        out = "情况D " + out + "\t改价为[" + str(attr["self_least_price"]) + "]"
+                        self.database.needToChangePrice(ean, attr["self_least_price"], gold_shop, variant_name)
                     else:
                         self.database.needToChangePrice(ean, price, gold_shop, variant_name)
                         out = "情况D " + out + "\t改价为[" + str(price) + "]"
@@ -252,8 +292,8 @@ class QuotesSpider(scrapy.Spider):
                         self.database.needToChangePrice(ean, price, gold_shop, variant_name)
                         out = "情况F " + out + "\t最低价[" + str(least_price) + "]\t" + "差价比[" + \
                               str(round(diff2 * 100, 2)) + "%]\t改价为[" + str(price) + "]"
-        out = "前台：" + out
-        print(out)
+        out = "前台," + out
+        logger.info(out)
 
     '''
     def prase2(self, response):
@@ -335,17 +375,17 @@ class QuotesSpider(scrapy.Spider):
     def handler1(self, ean, self_price, first_min_price, gold_shop):
         out_str = "#1\t" + ean + ":" + "价格[" + str(self_price) + "]\t最低价[" + str(
             first_min_price) + "]\t本店铺[" + gold_shop + "]"
-        print(out_str)
+        logger.info(out_str)
 
     def handler2(self, ean, self_price, gold_price, gold_shop):
         out_str = "#2\t" + ean + ":" + "价格[" + str(self_price) + "]\t黄金购物车价格[" + str(
             gold_price) + "]\t自家店铺[" + gold_shop + "]"
-        print(out_str)
+        logger.info(out_str)
 
     def handler3(self, ean, self_price, gold_price, gold_shop, percent):
         out_str = "#3\t" + ean + ":" + "价格[" + str(self_price) + "]\t购物车[" + str(
             gold_price) + "]\t其他店铺[" + gold_shop + "]\t差价比[" + str(round(percent*100, 2)) + "%]"
-        print(out_str)
+        logger.info(out_str)
 
     def handler5(self, ean, self_price, gold_shop, infos, first_min_price, second_min_price,
                  first_min_shop, second_min_shop, fbs_price):
@@ -422,12 +462,12 @@ class QuotesSpider(scrapy.Spider):
                 else:
                     memo += "有FBS店铺"
                 self.sendNotice(ean, memo)
-        print(out_str)
+        logger.info(out_str)
 
     def handler6(self, ean, self_price, gold_price, gold_shop):
         out_str = "#6\t" + ean + ":" + "价格[" + str(self_price) + "]\t购物车[" + str(gold_price) + \
                   "]\t自家店铺[" + gold_shop + "]\t修改"
-        print(out_str)
+        logger.info(out_str)
         self.needToChangePrice(ean, gold_price, gold_shop)
 
     def handler7(self, ean, self_price, gold_price, gold_shop, infos, self_least_price):
@@ -444,7 +484,7 @@ class QuotesSpider(scrapy.Spider):
             else:
                 out_str += "改价为[" + str(to_price) + "]"
                 self.needToChangePrice(ean, to_price, gold_shop)
-        print(out_str)
+        logger.info(out_str)
 
     def handler8(self, ean, self_price, gold_price, gold_shop, percent, self_least_price):
         out_str = "#8\t" + ean + ":" + "价格[" + str(self_price) + "]\t购物车[" + str(
@@ -455,39 +495,43 @@ class QuotesSpider(scrapy.Spider):
         else:
             out_str += "改价为[" + str(to_price) + "]"
             self.needToChangePrice(ean, to_price, gold_shop)
-        print(out_str)
+        logger.info(out_str)
     '''
 
 
-class SpiderProcess(multiprocessing.Process):
+class SpiderProcess(object):
     def __init__(self, name):
-        multiprocessing.Process.__init__(self)  # 重构了Process类里面的构造函数
         self.name = name
-
-    def run(self):  # 固定用run方法，启动进程自动调用run方法
-        print("启动前台抓取任务")
         settings = get_project_settings()
         settings.set('USER_AGENT',
                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                      "Chrome/70.0.3538.77 Safari/537.36")
         settings.set('LOG_FILE', self.name + ".log")
         settings.set('ROBOTSTXT_OBEY', False)
-        process = CrawlerProcess(settings)
-        process.crawl(QuotesSpider, shop_name=self.name)
-        process.start()
-        process.join()
-        print("前台抓取数据一轮完成")
-        count = random.randint(10, 30)
-        database = DataManager(self.name)
-        attr = database.getAttr("EMPTY")
-        if attr["minute"] != 0:
-            count = attr["minute"] * 60
-        minute = 0
-        while minute <= count:
-            database.handlerStatus()
-            minute += 1
-            time.sleep(1)
-            attr = database.getAttr("EMPTY")
-            count = attr["minute"] * 60
+        settings.set('DUPEFILTER_CLASS', 'scrapy.dupefilters.BaseDupeFilter')
+        self.process = CrawlerProcess(settings)
+
+    def run(self):  # 固定用run方法，启动进程自动调用run方法
+        logger.info("前台,启动前台抓取任务")
+        self.process.crawl(QuotesSpider, shop_name=self.name)
+        self.process.start()
+        self.process.join()
+        logger.info("前台,抓取数据结束")
+        # count = random.randint(10, 30)
+        # database = DataManager(self.name)
+        # attr = database.getAttr("EMPTY")
+        # count = 2
+        # if attr["minute"] != 0:
+        #     count = attr["minute"] * 60
+        #
+        # minute = 0
+        # while minute <= count:
+        #     database.handlerStatus()
+        #     minute += 1
+        #     time.sleep(1)
+        #     attr = database.getAttr("EMPTY")
+        #     count = 2
+        #     if attr["minute"] != 0:
+        #         count = attr["minute"] * 60
 
 

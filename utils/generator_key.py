@@ -184,4 +184,6 @@ print(generator("WEIG52OBIS5IAB9MG26A", 365, 1))  # nancy 2021-10-16
 print(generator("PEFE52HBLLGIAA9LF90G", 365, 1))  # nancy 2021-10-16
 print(generator("2FJ7I6M5ED715D6E6294", 368, 1))  # gg 39.104.76.234 2021-10-30
 print(generator("0LICIQXDUOGDDB7P7EWC", 90, 1))  # 李秋生 2021-11-16
+print(generator("VD5540HAHMDD9T894D8G", 90, 1))  # gg 119.45.116.129 2021-02-27
+print(generator("UAI65GI60MEJJW7VIC74", 91, 1))  # 了解改价软件 2022-03-01
 print(generator("NAXD5GH6BL7JJ77QD7SW", 60, 1))  # 你好，了解改价 2022-04-15

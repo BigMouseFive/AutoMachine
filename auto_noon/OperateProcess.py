@@ -1,49 +1,36 @@
 import multiprocessing
+import os
 import time
 import requests
 import json
 import traceback
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from auto_noon.DataManager import DataManager
-
+from logger import logger
 CHROME_DRIVER_PATH = "../chromedriver.exe"
 
 
-def printYellow(mess):
-    # print(Fore.YELLOW + mess)
-    print(mess)
-
-
-def printRed(mess):
-    # print(Fore.RED + mess)
-    print(mess)
-
-
-class OperateProcess(multiprocessing.Process):
+class OperateProcess(object):
     def __init__(self, name):
-        multiprocessing.Process.__init__(self)  # 重构了Process类里面的构造函数
         self.name = name
+        self.headless = True
+        if os.path.exists("open_chrome"):
+            self.headless = False
         self.record = {}  # {"ean":[price, count]}
-
-    def exceptHandler(self, info):
-        info = time.strftime("%Y-%m-%d %H:%M:%S") + "\n" + info
-        print(info)
-        # self.debug_file.write(info)
-        # self.debug_file.flush()
 
     def run(self):  # 固定用run方法，启动进程自动调用run方法
         self.database = DataManager(self.name)
-        printYellow("启动后台改价任务")
+        logger.info("后台,启动后台改价任务")
         while 1:
             option = webdriver.ChromeOptions()
             option.add_argument('--no-sandbox')
             option.add_argument('--disable-dev-shm-usage')
-            option.add_argument("headless")
+            if self.headless:
+                option.add_argument("headless")
             option.add_argument("--window-size=1920,1050")
             option.add_argument('ignore-certificate-errors')
             option.add_argument('log-level=3')
@@ -59,21 +46,24 @@ class OperateProcess(multiprocessing.Process):
             # self.chrome.maximize_window()
             try:
                 self.LoginAccount()
+                self.NewInventory()
+                self.OperateProductSelenium()
             except:
-                self.exceptHandler(traceback.format_exc())
+                logger.info("后台," + traceback.format_exc())
+                logger.info("后台,重启......")
                 self.chrome.quit()
                 self.database.handlerStatus()
                 continue
 
     def LoginAccount(self):
-        printYellow("后台：登录账户1")
+        logger.info("后台,登录账户1")
         # todo dylan 测试临时屏蔽
         self.database.handlerStatus()
-        printYellow("后台：登录账户2")
+        logger.info("后台,登录账户2")
         self.chrome.get('https://login.noon.partners/en/')
         try:
             account, password = self.database.getAccountAndPassword()
-            printYellow("获取账号：" + str(account))
+            logger.info("后台,获取账号：" + str(account))
             xpath = ".//div[@class='jsx-1240009043 group']"
             WebDriverWait(self.chrome, 30, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
             elemLogin = self.chrome.find_elements_by_xpath(".//div[@class='jsx-1240009043 group']/input")
@@ -85,7 +75,7 @@ class OperateProcess(multiprocessing.Process):
             elemLogin[1].send_keys(password)
             elemNewLoginBtn.click()
         except:
-            printYellow("后台：方式1登录失败，尝试方式2")
+            logger.info("后台,方式1登录失败，尝试方式2")
         i = 0
         compare = ""
         shop_type = self.database.getShopType()
@@ -94,28 +84,16 @@ class OperateProcess(multiprocessing.Process):
         elif shop_type == "uae":
             compare = "https://core.noon.partners/en-ae/"
         compare = "https://core.noon.partners/en-"
-        print("账号类型：" + shop_type)
+        logger.info("后台,账号类型：" + shop_type)
         while compare not in self.chrome.current_url:
             time.sleep(1)
             i = i + 1
             if i > 150:
+                logger.info("后台,登录超时，请检查账号密码时候有误")
                 raise TimeoutError
-        while 1:
-            try:
-                # todo dylan 测试预约fbn功能，临时屏蔽原有改价函数
-                self.NewInventory()
-                # self.ScheduleFBN()
-            except:
-                # self.exceptHandler(traceback.format_exc())
-                raise
 
     def NewInventory(self):
-        # if not self.database.shopLock():
-        #     printYellow("后台：已经超出店铺数量限制")
-        #     self.database.setStopStatus()
-        #     while True:
-        #         time.sleep(6000)
-        printYellow("后台：打开改价页面")
+        logger.info("后台,打开改价页面")
         self.loginHandler = self.chrome.current_window_handle
         handlers = self.chrome.window_handles
         self.unknownHandler = ""
@@ -135,13 +113,6 @@ class OperateProcess(multiprocessing.Process):
             if handler != self.loginHandler and handler != self.unknownHandler:
                 self.inventoryHandler = handler
                 break
-        while 1:
-            try:
-                self.OperateProductSelenium()
-            except:
-                # self.exceptHandler(traceback.format_exc())
-                self.chrome.refresh()
-                continue
 
     def prepareJSON(self, ret_json, partner_sku, price):
         global is_active, json_sale_end, json_sale_start
@@ -188,69 +159,9 @@ class OperateProcess(multiprocessing.Process):
 
         return json.dumps(ret_json)
 
-    def OperateProductRequests(self):
-        printYellow("后台：开始改价")
-        selenium_cookies = self.chrome.get_cookies()
-        selenium_headers = self.chrome.execute_script("return navigator.userAgent")
-        selenium_headers = {
-            'User-Agent': selenium_headers,
-            "origin": "https://catalog.noon.partners",
-            "Content-Type": "application/json",
-            "x-locale": "en-sa"
-        }
-        s = requests.session()
-        s.headers.update(selenium_headers)
-        for cookie in selenium_cookies:
-            short_cookie = {cookie["name"]: cookie["value"]}
-            requests.utils.add_dict_to_cookiejar(s.cookies, short_cookie)
-        s.verify = "./noon.cer"
-        while True:
-            time.sleep(1)
-            ean, price, variant_name = self.database.getFirstNeedChangeItem()
-            if ean == "ean":
-                continue
-            out = "后台：" + time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + " " + str(round(price, 2))
-            url = "https://catalog.noon.partners/_svc/clapi-v1/catalog/items?limits=20&page=1&search=" + ean
-            r = s.get(url)
-            if r.status_code == 200:
-                ret_json = json.loads(r.text)
-                if ret_json is not None and "items" in ret_json:
-                    if len(ret_json["items"]) == 1 and "partner_sku" in ret_json["items"][0]:
-                        partner_sku = ret_json["items"][0]["partner_sku"]
-                        partner_sku = partner_sku.replace('.', '').replace('-', '')
-                        if len(partner_sku) > 0:
-                            url = "https://catalog.noon.partners/_svc/clapi-v1/catalog/item/details?psku_canonical=" + partner_sku
-                            r = s.get(url)
-                            if r.status_code == 200:
-                                ret_json = json.loads(r.text)
-                                try:
-                                    ret_json = self.prepareJSON(ret_json, partner_sku, price)
-                                    url = "https://catalog.noon.partners/_svc/clapi-v1/psku"
-                                    r = s.post(url, data=ret_json, headers={
-                                        "Referer": "https://catalog.noon.partners/en-sa/catalog/" + partner_sku})
-                                    if r.status_code == 200:
-                                        printYellow(out + "\t改价成功")
-                                    else:
-                                        printRed(out + "\t改价失败\t[6]")
-                                except:
-                                    printRed(out + "\t改价失败\t[5]")
-                                    raise
-                            else:
-                                printRed(out + "\t改价失败\t[4]")
-                        else:
-                            printRed(out + "\t改价失败\t[3]")
-                    else:
-                        printRed(out + "\t改价失败\t[2]")
-                else:
-                    printRed(out + "\t改价失败\t[1]")
-            else:
-                printRed(out + "\t改价失败\t[0]")
-
-            self.database.finishOneChangeItem(ean, price, variant_name)
-
     def OperateProductSelenium(self):
         error_count = 0
-        printYellow("后台：开始改价")
+        logger.info("后台,开始改价")
         while True:
             self.database.handlerStatus()
             # time.sleep(1)
@@ -258,7 +169,7 @@ class OperateProcess(multiprocessing.Process):
             if ean == "ean" and price == "price":
                 time.sleep(1)
                 continue
-            out = time.strftime("%Y-%m-%d %H:%M:%S") + " " + ean + "[" + variant_name + "]\t" + str(round(price, 2))
+            out = ean + "[" + variant_name + "]\t" + str(round(price, 2))
             self.chrome.switch_to.window(self.inventoryHandler)
             catelog_url_elems = []
             try:
@@ -305,14 +216,13 @@ class OperateProcess(multiprocessing.Process):
                     else:
                         limit -= 1
             except:
-                printRed(traceback.print_exc())
+                logger.info("后台," + traceback.print_exc())
                 error_count += 1
                 if error_count > 3:
                     raise
                 else:
                     continue
             if len(catelog_url_elems) != 1:
-                # printRed("后台：" + out + "\t没找到这个产品")
                 self.database.finishOneChangeItem(ean, price, variant_name)
                 continue
 
@@ -359,14 +269,17 @@ class OperateProcess(multiprocessing.Process):
                     self.database.addAChange(ean, variant_name, old_price, price)
                     self.database.addChangeRecord(ean, variant_name, time_change, price)
                     out += "[" + str(change_count + 1) + "次]"
-                    printYellow("后台：" + out + "\t改价成功")
+                    logger.info("后台," + out + "\t改价成功")
                 except:
                     out += "[" + str(change_count) + "次]"
-                    self.exceptHandler(traceback.format_exc())
-                    printRed("后台：" + out + "\t改价失败")
+                    error_count += 1
+                    if error_count > 3:
+                        raise
+                    else:
+                        logger.info("后台," + out + "\t改价失败")
             else:
                 out += "[" + str(change_count) + "次]"
-                printRed("后台：" + out + "\t达到最大改价次数")
+                logger.info("后台," + out + "\t达到最大改价次数")
 
             self.database.finishOneChangeItem(ean, price, variant_name)
             if flag:
@@ -374,7 +287,7 @@ class OperateProcess(multiprocessing.Process):
                 self.chrome.back()
 
     def ScheduleFBN(self):
-        printYellow("后台：打开预约界面")
+        logger.info("后台,打开预约界面")
         self.loginHandler = self.chrome.current_window_handle
         handlers = self.chrome.window_handles
         self.unknownHandler = ""
@@ -398,16 +311,16 @@ class OperateProcess(multiprocessing.Process):
             try:
                 self.ChooseOpenItem()
             except:
-                self.exceptHandler(traceback.format_exc())
+                logger.info(traceback.format_exc())
                 self.chrome.refresh()
                 continue
 
     def ChooseOpenItem(self):
-        print("后台：打开预约界面成功")
+        logger.info("后台,打开预约界面成功")
         WebDriverWait(self.chrome, 120, 0.5).until(EC.presence_of_element_located((By.XPATH, ".//div[@class='jsx-2800349317 ctr']")))
-        print("后台：选择Open项目")
+        logger.info("后台,选择Open项目")
         items = self.chrome.find_elements_by_xpath(".//table/tbody/tr")
-        print("items size:" + str(len(items)))
+        logger.info("后台,items size:" + str(len(items)))
         for item in items:
             status_div = item.find_element_by_xpath("./td[@data-label='Status']/div")
             if open in status_div.get_attribute("div"):
@@ -426,9 +339,8 @@ class OperateProcess(multiprocessing.Process):
                                 "=== '$apply' || $rootScope.$$phase === '$digest' || $http.pendingRequests.length !== 0) " \
                                 "{ window.qa.doneRendering = false; return false; } if (!window.qa.doneRendering) { " \
                                 "$timeout(function() { window.qa.doneRendering = true;}, 0); return false;}} return " \
-                                "true;} catch (ex) {return false;} "
+                                "true;} catch (ex) {return false;}"
         return driver.execute_script(checkPageFinishScript)
-
 
 
 # timeout 357 367 385 137 270
