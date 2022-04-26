@@ -262,16 +262,16 @@ class QuotesSpider(scrapy.Spider):
                     else:
                         price = round(min(infos[gold_shop][0], infos[self.shop_name][0]) - attr["lowwer"], 2)
                         if price < attr["self_least_price"]:
-                            out = "情况C " + out + "\t差价比[" + str(round(diff1 * 100, 2)) + "%]\t改价为[" + str(attr["self_least_price"]) + "]"
                             self.database.needToChangePrice(ean, attr["self_least_price"], gold_shop, variant_name)
+                            out = "情况C " + out + "\t差价比[" + str(round(diff1 * 100, 2)) + "%]\t改价为[" + str(attr["self_least_price"]) + "]"
                         else:
                             self.database.needToChangePrice(ean, price, gold_shop, variant_name)
                             out = "情况C " + out + "\t差价比[" + str(round(diff1 * 100, 2)) + "%]\t改价为[" + str(price) + "]"
                 else:
                     price = round(infos[self.shop_name][0] - attr["lowwer"], 2)
                     if price < max(infos[gold_shop][0], attr["self_least_price"]):
-                        out = "情况D " + out + "\t改价为[" + str(attr["self_least_price"]) + "]"
                         self.database.needToChangePrice(ean, attr["self_least_price"], gold_shop, variant_name)
+                        out = "情况D " + out + "\t改价为[" + str(attr["self_least_price"]) + "]"
                     else:
                         self.database.needToChangePrice(ean, price, gold_shop, variant_name)
                         out = "情况D " + out + "\t改价为[" + str(price) + "]"
@@ -287,7 +287,9 @@ class QuotesSpider(scrapy.Spider):
                 else:
                     price = round(min(infos[gold_shop][0], least_price) - attr["lowwer"], 2)
                     if price < attr["self_least_price"]:
-                        out = "情况F " + out + "\t最低价[" + str(least_price) + "]\t" + "不修改"
+                        self.database.needToChangePrice(ean, attr["self_least_price"], gold_shop, variant_name)
+                        out = "情况F " + out + "\t最低价[" + str(least_price) + "]\t" + "差价比[" + \
+                              str(round(diff2 * 100, 2)) + "%]\t改价为[" + str(attr["self_least_price"]) + "]"
                     else:
                         self.database.needToChangePrice(ean, price, gold_shop, variant_name)
                         out = "情况F " + out + "\t最低价[" + str(least_price) + "]\t" + "差价比[" + \
