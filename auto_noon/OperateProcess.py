@@ -276,6 +276,7 @@ class OperateProcess(object):
                     if error_count > 3:
                         raise
                     else:
+                        logger.info(traceback.format_exc())
                         logger.info("后台," + out + "\t改价失败")
             else:
                 out += "[" + str(change_count) + "次]"

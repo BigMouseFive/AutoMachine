@@ -63,10 +63,13 @@ class DataManager:
 
     def addChangeRecord(self, ean, variant_name, time_change, price):
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".ggc")
-        conn.execute("insert into 'change_record'(time_change, ean, variant_name, price) values (?,?,?,?);",
+        try:
+            conn = sqlite3.connect(self.name + ".ggc")
+            conn.execute("insert into 'change_record'(time_change, ean, variant_name, price) values (?,?,?,?);",
                      (time_change, ean, variant_name, price))
-        conn.commit()
+            conn.commit()
+        except:
+            pass
         self.lock.release()
 
     def isLowerThanMaxTimes(self, ean, variant_name):
@@ -87,17 +90,21 @@ class DataManager:
 
     def addAChange(self, ean, variant_name, old_price, price):
         self.lock.acquire()
-        conn = sqlite3.connect(self.name + ".ggc")
-        ret = conn.execute("select * from 'change' where ean=? and variant_name=?;", (ean, variant_name)).fetchall()
-        if len(ret) <= 0:
-            price = str(old_price) + "," + str(price)
-            conn.execute("insert into 'change'(ean, variant_name, all_price, count) values (?,?,?,1);",
-                         (ean, variant_name, price))
-        else:
-            conn.execute("update 'change' set all_price=all_price||?, count=count+1 where ean=? and variant_name=?;",
-                         ("," + str(price), ean, variant_name))
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(self.name + ".ggc")
+            ret = conn.execute("select * from 'change' where ean=? and variant_name=?;", (ean, variant_name)).fetchall()
+            if len(ret) <= 0:
+                price = str(old_price) + "," + str(price)
+                conn.execute("insert into 'change'(ean, variant_name, all_price, count) values (?,?,?,1);",
+                             (ean, variant_name, price))
+            else:
+                conn.execute(
+                    "update 'change' set all_price=all_price||?, count=count+1 where ean=? and variant_name=?;",
+                    ("," + str(price), ean, variant_name))
+            conn.commit()
+            conn.close()
+        except:
+            pass
         self.lock.release()
 
     def getAttr(self, ean):
