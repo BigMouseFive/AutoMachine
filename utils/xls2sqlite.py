@@ -82,12 +82,14 @@ class X2S:
                 v1 = sheet.cell(i, 0).value
                 v2 = sheet.cell(i, 1).value
                 v3 = sheet.cell(i, 2).value
+                v4 = sheet.cell(i, 2).value
                 try:
                     v2 = float(v2)
-                    v3 = int(v3)
-                    conn.execute("REPLACE INTO 'CPComplexAttr'(shop, ean, least_price, max_times) VALUES (?, ?, ?, ?);",(shop_name, v1, v2, v3))
+                    v3 = float(v3)
+                    v4 = int(v4)
+                    conn.execute("REPLACE INTO 'CPComplexAttr'(shop, ean, least_price, highest_price, max_times) VALUES (?, ?, ?, ?, ?);",(shop_name, v1, v2, v3, v4))
                     count += 1
-                    print(str(count) + ":" + str(v1) + "," + str(v2) + "," + str(v3))
+                    print(str(count) + ":" + str(v1) + "," + str(v2) + "," + str(v3) + "," + str(v4))
                 except:
                     print("表格内容错误，第" + str(i+1) + "行")
         except:
@@ -192,8 +194,9 @@ class S2X:
         conn = sqlite3.connect(self.src)
         ret = []
         try:
-            ret = conn.execute("select ean, least_price, max_times from 'CPComplexAttr' where shop=?;", (shop,)).fetchall()
+            ret = conn.execute("select ean, least_price, highest_price, max_times from 'CPComplexAttr' where shop=?;", (shop,)).fetchall()
         except:
+            traceback.print_exc()
             conn.close()
             print("获取店铺定制化参数失败")
             # os.system("pause")
@@ -204,12 +207,14 @@ class S2X:
             sheet = self.xls.add_sheet(shop)
             sheet.write(0, 0, label="ean")
             sheet.write(0, 1, label="least_price")
-            sheet.write(0, 2, label="max_times")
+            sheet.write(0, 2, label="highest_price")
+            sheet.write(0, 3, label="max_times")
 
             for i in range(1, len(ret)+1):
                 sheet.write(i, 0, label=ret[i - 1][0])
                 sheet.write(i, 1, label=ret[i - 1][1])
                 sheet.write(i, 2, label=ret[i - 1][2])
+                sheet.write(i, 3, label=ret[i - 1][3])
             self.xls.save(self.dst)
             print("导出到表格成功")
         except:
@@ -287,3 +292,5 @@ except:
 # a.exportGoldCar()
 # a = X2S("C:\\Users\\戴锐\\Documents\\follow_items.xlsx", "C:\\D\\Github\\lemon01_follow\\x64\\Debug\\windows.storage")
 # a.addFollowItems("BuyMore")
+# a = S2X("C:\\D\\Github\\lemon01\\x64\\Debug\\windows.storage", "C:\\Users\\戴锐\\Documents\\test.xlsx")
+# a.exportProductAttr("BuyMore")

@@ -109,18 +109,20 @@ class DataManager:
 
     def getAttr(self, ean):
         self.lock.acquire()
-        attr = {"self_least_price": 0, "minute": 0,
-                "percent": 0.1, "lowwer": 0,
+        # dylandai 2022-07-03 增加self_highest_price最高价和high_precent提价百分比
+        attr = {"self_least_price": 0, "self_highest_price": 999999,
+                "minute": 0, "percent": 0.1, "high_percent": 0.1, "lowwer": 0,
                 "my_shop": [str(self.name).lower()]}
         conn = sqlite3.connect(DATABASE_PATH)
         # 通用改价参数
         try:
-            ret = conn.execute("select minute,percent,lowwer,my_shop from 'CPAttr' where shop=?;", (self.name,)).fetchall()
+            ret = conn.execute("select minute,percent,high_percent,lowwer,my_shop from 'CPAttr' where shop=?;", (self.name,)).fetchall()
             if len(ret) > 0:
                 attr["minute"] = ret[0][0]
                 attr["percent"] = ret[0][1]
-                attr["lowwer"] = ret[0][2]
-                attr["my_shop"] += ret[0][3].lower().strip().split(",")
+                attr["high_percent"] = ret[0][2]
+                attr["lowwer"] = ret[0][3]
+                attr["my_shop"] += ret[0][4].lower().strip().split(",")
         except:
             raise
 
@@ -133,6 +135,16 @@ class DataManager:
         except:
             attr["self_least_price"] = 0
             print(ean + ": " + str(attr["self_least_price"]))
+
+        # 具体某个产品的最高价
+        try:
+            ret = conn.execute("select highest_price from 'CPComplexAttr' where ean=? and shop=?;",
+                               (ean, self.name)).fetchall()
+            if len(ret) > 0:
+                attr["self_highest_price"] = ret[0][0]
+        except:
+            attr["self_highest_price"] = 999999
+            print(ean + ": " + str(attr["self_highest_price"]))
         conn.close()
         self.lock.release()
         return attr

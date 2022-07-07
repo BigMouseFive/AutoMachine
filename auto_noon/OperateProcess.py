@@ -180,6 +180,7 @@ class OperateProcess(object):
                 elemSearch.send_keys(ean[0:-1])
                 elemSearch.send_keys(Keys.ENTER)
                 limit = 4
+                find_type = ""
                 while limit:
                     time.sleep(1)
                     # 判断是否还在搜索中
@@ -202,10 +203,13 @@ class OperateProcess(object):
                             if len(td_elem.text) >= 1 and str(td_elem.text)[0:-1] == ean[0:-1]:
                                 catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[2]//a")
                                 if len(catelog_url_elems) == 0:
+                                    find_type = "1"
                                     catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[3]//a")
                                 if len(catelog_url_elems) == 0:
+                                    find_type = "2"
                                     catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[1]//a")
                                 if len(catelog_url_elems) == 0:
+                                    find_type = "3"
                                     catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[4]//a")
                                 has_find = True
                                 break

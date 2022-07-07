@@ -81,22 +81,17 @@ class QuotesSpider(scrapy.Spider):
         # for quote in response.xpath(".//div[@class='jsx-3152181095 productContainer']"):
         for quote in response.xpath(".//div[contains(@class, 'productContainer')]"):
             self.database.handlerStatus()
-            time.sleep(random.uniform(0.5, 2.5))
-            uri = ""
-            if self.handler == "parseHandler_a":
-                uri = "https://www.noon.com" + str(quote.xpath(".//a[contains(@class, 'product')]/@href").extract()[0])
-            elif self.handler == "parseHandler_b" or self.handler == "parseHandler_c":
-                uri = "https://www.noon.com/_svc/catalog/api/u/"
-                uri += str(quote.xpath("./a/@href").extract()[0]) + "/product/"
-                uri += str(quote.xpath("./a/@id").extract()[0].split("-")[-1]) + "/p"
+            time.sleep(random.uniform(0.5, 1.5))
+            uri = "https://www.noon.com/_svc/catalog/api/u/"
+            uri += str(quote.xpath("./a/@href").extract()[0]) + "/product/"
+            ean = str(quote.xpath("./a/@id").extract()[0].split("-")[-1])
+            if len(ean) > 0 and ean[0] == "Z":
+                logger.info("前台," + ean + "\t不被跟卖\t跳过")
+                continue
+            uri += ean + "/p"
             if uri is not None:
                 uri = uri.split('?')[0]
-                if self.handler == "parseHandler_a":
-                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_a)
-                elif self.handler == "parseHandler_b":
-                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
-                elif self.handler == "parseHandler_c":
-                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_c)
+                yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
 
         # 获取下一页的url, （DEL::如果没有就从头开始）
         next_page_list = response.xpath(
@@ -139,13 +134,6 @@ class QuotesSpider(scrapy.Spider):
         logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
         yield response.follow(next_page, callback=self.parse)
 
-    def parseHandler_a(self, response):
-        infos, gold_shop = self.getAllPirce_a(response)  # 获取所有的价格并以此形式返回{shop_name:[price, rating, fullfilled], ...}
-        if gold_shop == "$Rt%6y":
-            gold_shop = self.shop_name
-        ean = response._get_url().split("/")[-2]  # EAN
-        self.solutionNoon(ean, infos, gold_shop)
-
     def parseHandler_b(self, response):
         if not response.text:
             logger.info("前台,parseHandler_b: empty response")
@@ -160,72 +148,21 @@ class QuotesSpider(scrapy.Spider):
                     variant_name = variant["variant"]
                     if len(offers) == 0:
                         continue
-                    infos, gold_shop = self.getAllPirce_b(offers)
+                    infos, gold_shop, least_price, second_least_price = self.getAllPirce_b(offers)
                     if self.shop_name in infos:
-                        self.solutionNoon(ean, infos, gold_shop, variant_name)
+                        self.solutionNoon(ean, infos, gold_shop, least_price, second_least_price, variant_name)
                 except ValueError:
                     logger.info("前台,parseHandler_b: handler variant error: " + str(variant))
         except ValueError:
             logger.info("前台,parseHandler_b: handler json error")
             return
 
-    def parseHandler_c(self, response):
-        if not response.text:
-            logger.info("前台,parseHandler_c: empty response")
-            return
-        try:
-            res_json = json.loads(response.text)
-            sku = res_json["product"]["sku"]
-            if not sku: sku = ""
-            brand = res_json["product"]["brand"]
-            if not brand: brand = ""
-            specifications = res_json["product"]["specifications"]
-            model_name = " "
-            model_number = " "
-            for specification in specifications:
-                if specification["code"] == "model_number":
-                    model_number = specification["value"]
-                if specification["code"] == "model_name":
-                    model_name = specification["value"]
-
-            logger.info("前台," + sku + "," + str(model_name) + "," + str(model_number))
-        except ValueError:
-            logger.info("前台,parseHandler_c: handler json error")
-            return
-
-    def getAllPirce_a(self, response):
-        infos = {}
-        gold_shop = "$Rt%6y"
-        rows = response.xpath(".//ul[contains(@class, 'offersList')]/li")
-        for row in rows:
-            price = row.xpath(".//span[@class='value')]//text()").extract()[0]
-            price = round(float(price), 2)
-            shop_name = row.xpath(".//p[@class='jsx-1312782570')]//text()").extract()
-            shop_name = str(shop_name[2]).lower()
-            if gold_shop == "$Rt%6y":
-                gold_shop = shop_name
-            ret = row.xpath(".//div[contains(@class, 'container')]")
-            is_fbn = False
-            if len(ret) > 0:
-                is_fbn = True
-            rating = 100
-            infos[shop_name] = [price, rating, is_fbn]
-        if len(infos) == 0:
-            price = response.xpath(
-                ".//div[contains(@class, 'pdpPrice']//span[@class='value']//text())").extract()[0]
-            price = round(float(price), 2)
-            is_fbn = False
-            ret = response.xpath(
-                ".//div[@class='jsx-2490358733 shippingEstimatorContainer']//div[contains(@class, 'container')]")
-            if len(ret) > 0:
-                is_fbn = True
-            rating = 100
-            infos[self.shop_name] = [price, rating, is_fbn]
-        return infos, gold_shop
-
     def getAllPirce_b(self, offers):
         infos = {}
         gold_shop = offers[0]["store_name"].lower()
+        price_list = []
+        least_price = 999999
+        second_least_price = 999999
         for offer in offers:
             # logger.info(offer)
             is_fbn = offer["is_fbn"] == 1
@@ -236,21 +173,55 @@ class QuotesSpider(scrapy.Spider):
             if offer["sale_price"]:
                 price = offer["sale_price"]
             infos[offer["store_name"].lower()] = [price, rating, is_fbn]
-        return infos, gold_shop
+            price_list.append(price)
+        # 价格排序
+        price_list.sort()
+        if len(price_list) >= 1:
+            least_price = price_list[0]
+        if len(price_list) >= 2:
+            second_least_price = price_list[1]
+        return infos, gold_shop, least_price, second_least_price
 
-    def solutionNoon(self, ean, infos, gold_shop, variant_name=""):
+    def solutionNoon(self, ean, infos, gold_shop, least_price, second_least_price, variant_name=""):
         if not self.database.isInWhiteList(ean, variant_name):
             out = "前台,不在白名单 " + ean + "[" + variant_name + "]\t本店铺[" + str(infos[self.shop_name][0]) + "]\t" + \
-              "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]"
+              "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]\t店铺数量[" + str(len(infos)) + "]"
             logger.info(out)
             return
 
         attr = self.database.getAttr(ean)
         out = ean + "[" + variant_name + "]\t本店铺[" + str(infos[self.shop_name][0]) + "]\t" + \
-              "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]"
+              "购物车[" + str(infos[gold_shop][0]) + "][" + gold_shop + "]\t店铺数量[" + str(len(infos)) + "]"
         self.database.spiderRecord(ean, infos[gold_shop][0], gold_shop, variant_name)
         if gold_shop in attr["my_shop"]:  # 黄金购物车是自家店铺
-            out = "情况A " + out + "\t不修改"
+            if infos[gold_shop][0] > least_price or (infos[gold_shop][0] == least_price and least_price == second_least_price):
+                out = "情况A " + out + " 最低价[" + str(least_price) + "]\t不修改"
+            else:  # 是最低价
+                out += " 第二低价[" + str(second_least_price) + "]"
+                price = round(second_least_price - attr["lowwer"], 2)
+                if (price - infos[gold_shop][0]) / infos[gold_shop][0] > attr["high_percent"]:  # 超过了提价比
+                    price = round(infos[gold_shop][0] * (1 + attr["high_percent"]), 2)
+                    if price > attr["self_highest_price"]:  # 超过了最高价
+                        price = round(attr["self_highest_price"], 2)
+                        if price > infos[gold_shop][0]:
+                            self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                            out = "情况G " + out + "\t提价比[" + str(
+                                round((price - infos[gold_shop][0]) / infos[gold_shop][0] * 100, 2)) + "%]\t改价为[" + str(
+                                price) + "]"
+                        else:  # 改价后价格小于等于当前价格
+                            out = "情况G " + out + "\t不修改"
+                    elif price > infos[gold_shop][0]:  # 未超过最高价
+                        self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                        out = "情况G " + out + "\t提价比[" + str(
+                            round((price - infos[gold_shop][0]) / infos[gold_shop][0] * 100, 2)) + "%]\t改价为[" + str(
+                            price) + "]"
+                    else:  # 改价后价格小于等于当前价格
+                        out = "情况H " + out + "\t不修改"
+                elif price > infos[gold_shop][0]:  # 未超过提价比
+                    self.database.needToChangePrice(ean, price, gold_shop, variant_name)
+                    out = "情况I " + out + "\t提价比[" + str(round((price - infos[gold_shop][0]) / infos[gold_shop][0] * 100, 2)) + "%]\t改价为[" + str(price) + "]"
+                else:  # 改价后价格小于等于当前价格
+                    out = "情况I " + out + "\t不修改"
         else:
             if infos[self.shop_name][2]:  # 是FBN产品
                 diff1 = abs(infos[gold_shop][0] - infos[self.shop_name][0]) / infos[self.shop_name][0]
@@ -301,11 +272,15 @@ class SpiderProcess(object):
         self.name = name
         settings = get_project_settings()
         settings.set('USER_AGENT',
-                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                     "Chrome/70.0.3538.77 Safari/537.36")
+                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36")
         settings.set('LOG_FILE', self.name + ".log")
         settings.set('ROBOTSTXT_OBEY', False)
         settings.set('DUPEFILTER_CLASS', 'scrapy.dupefilters.BaseDupeFilter')
+        # print(settings.get("TELNETCONSOLE_ENABLED"))
+        # print(settings.get("CONCURRENT_REQUESTS"))
+        # print(settings.get("CONCURRENT_REQUESTS_PER_DOMAIN"))
+        # print(settings.get("CONCURRENT_REQUESTS_PER_IP"))
+        # print(settings.get("DOWNLOAD_DELAY"))
         self.process = CrawlerProcess(settings)
 
     def crawl(self):
