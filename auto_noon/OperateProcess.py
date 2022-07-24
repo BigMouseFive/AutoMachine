@@ -1,17 +1,22 @@
-import multiprocessing
+import io
 import os
 import time
+import zipfile
 import requests
 import json
 import traceback
 from selenium import webdriver
+from selenium.common.exceptions import SessionNotCreatedException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
 from auto_noon.DataManager import DataManager
 from logger import logger
+
 CHROME_DRIVER_PATH = "../chromedriver.exe"
+CHROME_DRIVER_URL = "https://registry.npmmirror.com/-/binary/chromedriver/"
 
 
 class OperateProcess(object):
@@ -42,7 +47,15 @@ class OperateProcess(object):
                 }
             }
             option.add_experimental_option('prefs', prefs)
-            self.chrome = webdriver.Chrome(executable_path=CHROME_DRIVER_PATH, chrome_options=option)
+            try:
+                self.chrome = webdriver.Chrome(executable_path=CHROME_DRIVER_PATH, chrome_options=option)
+            except SessionNotCreatedException:
+                logger.info("后台,ChromeDriver版本不匹配，将尝试获取匹配版本")
+                version = \
+                traceback.format_exc().split("Current browser version is")[-1].split("with binary path")[0].split(".")[
+                    0].strip()
+                self.getChromeDriver(version)
+                continue
             # self.chrome.maximize_window()
             try:
                 self.LoginAccount()
@@ -54,6 +67,22 @@ class OperateProcess(object):
                 self.chrome.quit()
                 self.database.handlerStatus()
                 continue
+
+    # 获取对应版本的chromedriver
+    def getChromeDriver(self, version):
+        logger.info("后台,获取ChromeDriver[" + str(version) + "]")
+        ret = requests.get(CHROME_DRIVER_URL)
+        for item in ret.json():
+            if version in item["name"]:
+                logger.info("后台,找到匹配版本[" + str(item["name"]) + "]")
+                ret = requests.get(CHROME_DRIVER_URL + item["name"] + "chromedriver_win32.zip")
+                zip_data = zipfile.ZipFile(io.BytesIO(ret.content))
+                for file in zip_data.filelist:
+                    if file.filename == "chromedriver.exe":
+                        with open(CHROME_DRIVER_PATH, "wb") as f:
+                            f.write(zip_data.read(file))
+                            logger.info("后台,获取ChromeDriver成功，将重启后台")
+                        return
 
     def LoginAccount(self):
         logger.info("后台,登录账户1")
@@ -204,13 +233,16 @@ class OperateProcess(object):
                                 catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[2]//a")
                                 if len(catelog_url_elems) == 0:
                                     find_type = "1"
-                                    catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[3]//a")
+                                    catelog_url_elems = self.chrome.find_elements_by_xpath(
+                                        "//table/tbody/tr[1]/td[3]//a")
                                 if len(catelog_url_elems) == 0:
                                     find_type = "2"
-                                    catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[1]//a")
+                                    catelog_url_elems = self.chrome.find_elements_by_xpath(
+                                        "//table/tbody/tr[1]/td[1]//a")
                                 if len(catelog_url_elems) == 0:
                                     find_type = "3"
-                                    catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[4]//a")
+                                    catelog_url_elems = self.chrome.find_elements_by_xpath(
+                                        "//table/tbody/tr[1]/td[4]//a")
                                 has_find = True
                                 break
                         if has_find:
@@ -235,7 +267,8 @@ class OperateProcess(object):
                 self.chrome.execute_script("arguments[0].click()", catelog_url_elems[0])
                 try:
                     sale_price_xpath = "//input[@name='salePrice']"
-                    WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, sale_price_xpath)))
+                    WebDriverWait(self.chrome, 80, 0.5).until(
+                        EC.presence_of_element_located((By.XPATH, sale_price_xpath)))
                     elemInput = self.chrome.find_element_by_xpath(sale_price_xpath)
                     value = elemInput.get_attribute("value")
                     if value is None or value == "value" or len(value) == 0:
@@ -322,7 +355,8 @@ class OperateProcess(object):
 
     def ChooseOpenItem(self):
         logger.info("后台,打开预约界面成功")
-        WebDriverWait(self.chrome, 120, 0.5).until(EC.presence_of_element_located((By.XPATH, ".//div[@class='jsx-2800349317 ctr']")))
+        WebDriverWait(self.chrome, 120, 0.5).until(
+            EC.presence_of_element_located((By.XPATH, ".//div[@class='jsx-2800349317 ctr']")))
         logger.info("后台,选择Open项目")
         items = self.chrome.find_elements_by_xpath(".//table/tbody/tr")
         logger.info("后台,items size:" + str(len(items)))
@@ -349,3 +383,7 @@ class OperateProcess(object):
 
 
 # timeout 357 367 385 137 270
+if __name__ == "__main__":
+    logger.init()
+    p1 = OperateProcess("ZARIO")
+    p1.run()
