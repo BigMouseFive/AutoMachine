@@ -5,7 +5,7 @@ import time
 
 class Logger:
     def __init__(self):
-        self.logger =  .getLogger("test")  # 不加名称设置root logger
+        self.logger = logging.getLogger("test")  # 不加名称设置root logger
 
     def init(self):
         dir_name = time.strftime("%Y_%m_%d")
