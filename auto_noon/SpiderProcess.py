@@ -78,36 +78,29 @@ class QuotesSpider(scrapy.Spider):
             add_headers = {"x-locale": "en-sa"}
         elif shop_type == "uae":
             add_headers = {"x-locale": "en-ae"}
-        # for quote in response.xpath(".//div[@class='jsx-3152181095 productContainer']"):
-        for quote in response.xpath(".//div[contains(@class, 'productContainer')]"):
+        # 数据解析为json
+        data = json.loads(response.body.decode("utf-8"))
+        # 获取hits（产品信息）
+        hits = []
+        if "hits" in data and isinstance(data["hits"], list):
+            hits = data["hits"]
+        # 获取page页数上线
+        nb_pages = None
+        if "nbPages" in data:
+            nb_pages = data["nbPages"]
+        for hit in hits:
             self.database.handlerStatus()
             time.sleep(random.uniform(0.5, 2.5))
-            uri = ""
-            if self.handler == "parseHandler_a":
-                uri = "https://www.noon.com" + str(quote.xpath(".//a[contains(@class, 'product')]/@href").extract()[0])
-            elif self.handler == "parseHandler_b" or self.handler == "parseHandler_c":
-                uri = "https://www.noon.com/_svc/catalog/api/u/"
-                uri += str(quote.xpath("./a/@href").extract()[0]) + "/product/"
-                uri += str(quote.xpath("./a/@id").extract()[0].split("-")[-1]) + "/p"
+            uri = "https://www.noon.com/_svc/catalog/api/v3/u/"
+            uri += hit["url"] + "/"
+            uri += hit["sku"] + "/p"
             if uri is not None:
-                uri = uri.split('?')[0]
-                if self.handler == "parseHandler_a":
-                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_a)
-                elif self.handler == "parseHandler_b":
-                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
-                elif self.handler == "parseHandler_c":
-                    yield response.follow(uri, headers=add_headers, callback=self.parseHandler_c)
+                yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
 
         # 获取下一页的url, （DEL::如果没有就从头开始）
-        next_page_list = response.xpath(
-            "//li[contains(@class, 'next')]//a[@class='arrowLink']/@aria-disabled").extract()
-        if len(next_page_list) > 0:
-            value = str(next_page_list[0])
-        else:
-            value = None
-        if value is not None and value == "false":
+        if nb_pages is not None:
             self.page_index = self.page_index + 1
-            if self.page_index <= 50:
+            if self.page_index <= nb_pages:
                 with open(self.shop_name + "_page_size", "w") as f:
                     f.write(str(self.page_index))
                 next_page = self.origin_start_urls[0] + "&page=" + str(self.page_index)
@@ -139,13 +132,6 @@ class QuotesSpider(scrapy.Spider):
         logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
         yield response.follow(next_page, callback=self.parse)
 
-    def parseHandler_a(self, response):
-        infos, gold_shop = self.getAllPirce_a(response)  # 获取所有的价格并以此形式返回{shop_name:[price, rating, fullfilled], ...}
-        if gold_shop == "$Rt%6y":
-            gold_shop = self.shop_name
-        ean = response._get_url().split("/")[-2]  # EAN
-        self.solutionNoon(ean, infos, gold_shop)
-
     def parseHandler_b(self, response):
         if not response.text:
             logger.info("前台,parseHandler_b: empty response")
@@ -168,60 +154,6 @@ class QuotesSpider(scrapy.Spider):
         except ValueError:
             logger.info("前台,parseHandler_b: handler json error")
             return
-
-    def parseHandler_c(self, response):
-        if not response.text:
-            logger.info("前台,parseHandler_c: empty response")
-            return
-        try:
-            res_json = json.loads(response.text)
-            sku = res_json["product"]["sku"]
-            if not sku: sku = ""
-            brand = res_json["product"]["brand"]
-            if not brand: brand = ""
-            specifications = res_json["product"]["specifications"]
-            model_name = " "
-            model_number = " "
-            for specification in specifications:
-                if specification["code"] == "model_number":
-                    model_number = specification["value"]
-                if specification["code"] == "model_name":
-                    model_name = specification["value"]
-
-            logger.info("前台," + sku + "," + str(model_name) + "," + str(model_number))
-        except ValueError:
-            logger.info("前台,parseHandler_c: handler json error")
-            return
-
-    def getAllPirce_a(self, response):
-        infos = {}
-        gold_shop = "$Rt%6y"
-        rows = response.xpath(".//ul[contains(@class, 'offersList')]/li")
-        for row in rows:
-            price = row.xpath(".//span[@class='value')]//text()").extract()[0]
-            price = round(float(price), 2)
-            shop_name = row.xpath(".//p[@class='jsx-1312782570')]//text()").extract()
-            shop_name = str(shop_name[2]).lower()
-            if gold_shop == "$Rt%6y":
-                gold_shop = shop_name
-            ret = row.xpath(".//div[contains(@class, 'container')]")
-            is_fbn = False
-            if len(ret) > 0:
-                is_fbn = True
-            rating = 100
-            infos[shop_name] = [price, rating, is_fbn]
-        if len(infos) == 0:
-            price = response.xpath(
-                ".//div[contains(@class, 'pdpPrice']//span[@class='value']//text())").extract()[0]
-            price = round(float(price), 2)
-            is_fbn = False
-            ret = response.xpath(
-                ".//div[@class='jsx-2490358733 shippingEstimatorContainer']//div[contains(@class, 'container')]")
-            if len(ret) > 0:
-                is_fbn = True
-            rating = 100
-            infos[self.shop_name] = [price, rating, is_fbn]
-        return infos, gold_shop
 
     def getAllPirce_b(self, offers):
         infos = {}

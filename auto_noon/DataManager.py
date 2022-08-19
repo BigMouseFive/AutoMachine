@@ -165,9 +165,9 @@ class DataManager:
         url = []
         shop_type = self.getShopType()
         if shop_type == "ksa":
-            url = ["https://www.noon.com/saudi-en/"]
+            url = ["https://www.noon.com/saudi-en/_svc/catalog/api/v3/u/"]
         elif shop_type == "uae":
-            url = ["https://www.noon.com/uae-en/"]
+            url = ["https://www.noon.com/uae-en/_svc/catalog/api/v3/u/"]
 
         self.lock.acquire()
         conn = sqlite3.connect(DATABASE_PATH)

@@ -1,5 +1,7 @@
+import logging
 import multiprocessing
 import os
+import threading
 import time
 import requests
 import json
@@ -21,10 +23,36 @@ class OperateProcess(object):
         if os.path.exists("open_chrome"):
             self.headless = False
         self.record = {}  # {"ean":[price, count]}
+        self.monitor_num = 0
+        self.monitoring = False
+        self.mutex = threading.Lock()
+
+    def reset_monitor(self, flag=True, num=120):
+        self.mutex.acquire()
+        self.monitor_num = num
+        self.monitoring = flag
+        self.mutex.release()
+
+    # 监控chromedirver是否出现了长时间未返回的问题(socket层面）
+    def monitor_loop(self):
+        while True:
+            self.mutex.acquire()
+            try:
+                if self.monitoring:
+                    if self.monitor_num > 0:
+                        self.monitor_num -= 1
+                    else:
+                        self.chrome.quit()
+                        self.monitoring = False
+            except:
+                logging.warning(traceback.format_exc())
+            self.mutex.release()
+            time.sleep(1)
 
     def run(self):  # 固定用run方法，启动进程自动调用run方法
         self.database = DataManager(self.name)
         logger.info("后台,启动后台改价任务")
+        threading.Thread(target=self.monitor_loop).start()
         while 1:
             option = webdriver.ChromeOptions()
             option.add_argument('--no-sandbox')
@@ -51,31 +79,42 @@ class OperateProcess(object):
             except:
                 logger.info("后台," + traceback.format_exc())
                 logger.info("后台,重启......")
+                self.reset_monitor(False)
                 self.chrome.quit()
                 self.database.handlerStatus()
                 continue
 
     def LoginAccount(self):
         logger.info("后台,登录账户1")
-        # todo dylan 测试临时屏蔽
         self.database.handlerStatus()
         logger.info("后台,登录账户2")
+        self.reset_monitor()
         self.chrome.get('https://login.noon.partners/en/')
         try:
             account, password = self.database.getAccountAndPassword()
             logger.info("后台,获取账号：" + str(account))
             xpath = ".//div[@class='jsx-1240009043 group']"
+            self.reset_monitor()
             WebDriverWait(self.chrome, 30, 0.5).until(EC.presence_of_element_located((By.XPATH, xpath)))
+            self.reset_monitor()
             elemLogin = self.chrome.find_elements_by_xpath(".//div[@class='jsx-1240009043 group']/input")
+            self.reset_monitor()
             elemNewLoginBtn = self.chrome.find_element_by_xpath(
                 ".//button[@class='jsx-1789715842 base ripple primary uppercase fullWidth']")
+            self.reset_monitor()
             elemLogin[0].clear()
+            self.reset_monitor()
             elemLogin[1].clear()
+            self.reset_monitor()
             elemLogin[0].send_keys(account)
+            self.reset_monitor()
             elemLogin[1].send_keys(password)
+            self.reset_monitor()
             elemNewLoginBtn.click()
         except:
+            self.reset_monitor(False)
             logger.info("后台,方式1登录失败，尝试方式2")
+        self.reset_monitor(False)
         i = 0
         compare = ""
         shop_type = self.database.getShopType()
@@ -107,6 +146,7 @@ class OperateProcess(object):
             js = 'window.open("https://catalog.noon.partners/en-sa/catalog")'
         elif shop_type == "uae":
             js = 'window.open("https://catalog.noon.partners/en-ae/catalog")'
+        self.reset_monitor()
         self.chrome.execute_script(js)
         handlers = self.chrome.window_handles
         for handler in handlers:
@@ -163,6 +203,7 @@ class OperateProcess(object):
         error_count = 0
         logger.info("后台,开始改价")
         while True:
+            self.reset_monitor(False)
             self.database.handlerStatus()
             # time.sleep(1)
             ean, price, variant_name = self.database.getFirstNeedChangeItem()
@@ -170,42 +211,56 @@ class OperateProcess(object):
                 time.sleep(1)
                 continue
             out = ean + "[" + variant_name + "]\t" + str(round(price, 2))
+            self.reset_monitor()
             self.chrome.switch_to.window(self.inventoryHandler)
             catelog_url_elems = []
             try:
                 search_xpath = '//input[@type="search"]'
+                self.reset_monitor()
                 WebDriverWait(self.chrome, 100, 0.5).until(EC.presence_of_element_located((By.XPATH, search_xpath)))
+                self.reset_monitor()
                 elemSearch = self.chrome.find_element_by_xpath(search_xpath)
+                self.reset_monitor()
                 elemSearch.clear()
+                self.reset_monitor()
                 elemSearch.send_keys(ean[0:-1])
+                self.reset_monitor()
                 elemSearch.send_keys(Keys.ENTER)
                 limit = 4
                 while limit:
                     time.sleep(1)
                     # 判断是否还在搜索中
+                    self.reset_monitor()
                     please_wait_elems = self.chrome.find_elements_by_xpath("//div[contains(text(), 'Please wait')]")
                     if len(please_wait_elems) == 1:
                         limit -= 1
                         continue
 
                     # 判断是否搜索出结果
+                    self.reset_monitor()
                     no_data_elems = self.chrome.find_elements_by_xpath("//div[contains(text(), 'No Summary data')]")
                     if no_data_elems:
                         break
 
                     # 获取搜索结果的第一个产品的ean 判断是否和搜索内容一致
+                    self.reset_monitor()
                     tr_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]")
                     if len(tr_elems) != 0:
+                        self.reset_monitor()
                         td_elems = tr_elems[0].find_elements_by_xpath(".//td")
                         has_find = False
                         for td_elem in td_elems:
                             if len(td_elem.text) >= 1 and str(td_elem.text)[0:-1] == ean[0:-1]:
+                                self.reset_monitor()
                                 catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[2]//a")
                                 if len(catelog_url_elems) == 0:
+                                    self.reset_monitor()
                                     catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[3]//a")
                                 if len(catelog_url_elems) == 0:
+                                    self.reset_monitor()
                                     catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[1]//a")
                                 if len(catelog_url_elems) == 0:
+                                    self.reset_monitor()
                                     catelog_url_elems = self.chrome.find_elements_by_xpath("//table/tbody/tr[1]/td[4]//a")
                                 has_find = True
                                 break
@@ -216,6 +271,7 @@ class OperateProcess(object):
                     else:
                         limit -= 1
             except:
+                self.reset_monitor(False)
                 logger.info("后台," + traceback.print_exc())
                 error_count += 1
                 if error_count > 3:
@@ -228,19 +284,29 @@ class OperateProcess(object):
 
             change_count, flag = self.database.isLowerThanMaxTimes(ean, variant_name)
             if flag:
+                self.reset_monitor()
                 self.chrome.execute_script("arguments[0].click()", catelog_url_elems[0])
                 try:
                     sale_price_xpath = "//input[@name='salePrice']"
+                    self.reset_monitor()
                     WebDriverWait(self.chrome, 80, 0.5).until(EC.presence_of_element_located((By.XPATH, sale_price_xpath)))
+                    self.reset_monitor()
                     elemInput = self.chrome.find_element_by_xpath(sale_price_xpath)
+                    self.reset_monitor()
                     value = elemInput.get_attribute("value")
                     if value is None or value == "value" or len(value) == 0:
                         price_xpath = "//input[@name='price']"
+                        self.reset_monitor()
                         elemInput = self.chrome.find_element_by_xpath(price_xpath)
+                    self.reset_monitor()
                     old_price = round(float(elemInput.get_attribute("value")), 2)
+                    self.reset_monitor()
                     elemInput.clear()
+                    self.reset_monitor()
                     elemInput.send_keys(Keys.CONTROL, "a")
+                    self.reset_monitor()
                     elemInput.send_keys(Keys.DELETE)
+                    self.reset_monitor()
                     elemInput.send_keys(str(price))
 
                     # save_button_xpath = "//div[contains(text(), 'Save Changes')]"  # Submit
@@ -251,17 +317,23 @@ class OperateProcess(object):
 
                     # 点击按钮 Save Changes
                     save_changes_xpath = "//div[contains(text(), 'Save Changes')]"
+                    self.reset_monitor()
                     WebDriverWait(self.chrome, 20, 0.5).until(
                         EC.presence_of_element_located((By.XPATH, save_changes_xpath)))
+                    self.reset_monitor()
                     elemBtn = self.chrome.find_elements_by_xpath(save_changes_xpath)[-1]
+                    self.reset_monitor()
                     self.chrome.execute_script("arguments[0].click()", elemBtn)
                     time.sleep(0.5)
 
                     # 点击按钮submit
                     submit_button_xpath = "//div[contains(text(), 'Submit')]"
+                    self.reset_monitor()
                     WebDriverWait(self.chrome, 20, 0.5).until(
                         EC.presence_of_element_located((By.XPATH, submit_button_xpath)))
+                    self.reset_monitor()
                     elemBtn = self.chrome.find_elements_by_xpath(submit_button_xpath)[0]
+                    self.reset_monitor()
                     self.chrome.execute_script("arguments[0].click()", elemBtn)
                     time.sleep(0.5)
 
@@ -271,6 +343,7 @@ class OperateProcess(object):
                     out += "[" + str(change_count + 1) + "次]"
                     logger.info("后台," + out + "\t改价成功")
                 except:
+                    self.reset_monitor(False)
                     out += "[" + str(change_count) + "次]"
                     error_count += 1
                     if error_count > 3:
@@ -284,7 +357,9 @@ class OperateProcess(object):
 
             self.database.finishOneChangeItem(ean, price, variant_name)
             if flag:
+                self.reset_monitor()
                 self.chrome.back()
+                self.reset_monitor()
                 self.chrome.back()
 
     def ScheduleFBN(self):

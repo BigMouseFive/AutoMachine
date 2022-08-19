@@ -35,24 +35,3 @@ if __name__ == '__main__':
     pt1.start()
     p = SpiderProcess(name=name)
     p.run()
-
-
-# def skr(name):
-#     if __name__ == '__main__':
-#         os.system("title AutoMacine " + name)
-#         freeze_support()
-#         os.chdir(os.path.split(os.path.realpath(__file__))[0])
-#         pre_test(name)
-#         p1 = OperateProcess(name)
-#         pt1 = threading.Thread(target=p1.run)
-#         pt1.start()
-#         p = SpiderProcess(name=name)
-#         p.run()
-
-
-# skr("BuyMore")
-# skr("DZ-store")
-# skr("EasyGo")
-# skr("Wiwi")
-# skr("YYcom")
-
