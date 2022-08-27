@@ -60,6 +60,7 @@ class QuotesSpider(scrapy.Spider):
         self.database = DataManager(shop_name)
         self.shop_name = shop_name.lower()
         self.origin_start_urls = self.database.getScrapyUrl()
+        self.first_time = True
         self.page_index = 1
         self.start_urls = []
         try:
@@ -69,7 +70,7 @@ class QuotesSpider(scrapy.Spider):
         self.handler = "parseHandler_b"
         if len(self.origin_start_urls) > 0:
             self.start_urls.append(self.origin_start_urls[0] + "&page=" + str(self.page_index))
-        logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
+        # logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
 
     def parse(self, response):
         shop_type = self.database.getShopType()
@@ -78,31 +79,36 @@ class QuotesSpider(scrapy.Spider):
             add_headers = {"x-locale": "en-sa"}
         elif shop_type == "uae":
             add_headers = {"x-locale": "en-ae"}
-        # for quote in response.xpath(".//div[@class='jsx-3152181095 productContainer']"):
-        for quote in response.xpath(".//div[contains(@class, 'productContainer')]"):
+        if self.first_time:
+            next_page = self.origin_start_urls[0] + "&page=" + str(self.page_index)
+            logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
+            yield response.follow(next_page, headers=add_headers, callback=self.parse)
+            self.first_time = False
+            return
+        # 数据解析为json
+        data = json.loads(response.body.decode("utf-8"))
+        # 获取hits（产品信息）
+        hits = []
+        if "hits" in data and isinstance(data["hits"], list):
+            hits = data["hits"]
+        # 获取page页数上线
+        nb_pages = None
+        if "nbPages" in data:
+            nb_pages = data["nbPages"]
+
+        for hit in hits:
             self.database.handlerStatus()
-            time.sleep(random.uniform(0.5, 1.5))
-            uri = "https://www.noon.com/_svc/catalog/api/u/"
-            uri += str(quote.xpath("./a/@href").extract()[0]) + "/product/"
-            ean = str(quote.xpath("./a/@id").extract()[0].split("-")[-1])
-            if len(ean) > 0 and ean[0] == "Z":
-                logger.info("前台," + ean + "\t不被跟卖\t跳过")
-                continue
-            uri += ean + "/p"
+            time.sleep(random.uniform(0.5, 2.5))
+            uri = "https://www.noon.com/_svc/catalog/api/v3/u/"
+            uri += hit["url"] + "/"
+            uri += hit["sku"] + "/p"
             if uri is not None:
-                uri = uri.split('?')[0]
                 yield response.follow(uri, headers=add_headers, callback=self.parseHandler_b)
 
         # 获取下一页的url, （DEL::如果没有就从头开始）
-        next_page_list = response.xpath(
-            "//li[contains(@class, 'next')]//a[@class='arrowLink']/@aria-disabled").extract()
-        if len(next_page_list) > 0:
-            value = str(next_page_list[0])
-        else:
-            value = None
-        if value is not None and value == "false":
+        if nb_pages is not None:
             self.page_index = self.page_index + 1
-            if self.page_index <= 50:
+            if self.page_index <= nb_pages:
                 with open(self.shop_name + "_page_size", "w") as f:
                     f.write(str(self.page_index))
                 next_page = self.origin_start_urls[0] + "&page=" + str(self.page_index)
@@ -132,7 +138,7 @@ class QuotesSpider(scrapy.Spider):
         self.page_index = 1
         next_page = self.origin_start_urls[0] + "&page=" + str(self.page_index)
         logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
-        yield response.follow(next_page, callback=self.parse)
+        yield response.follow(next_page, headers=add_headers, callback=self.parse)
 
     def parseHandler_b(self, response):
         if not response.text:
