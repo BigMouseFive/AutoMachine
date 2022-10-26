@@ -84,6 +84,7 @@ class QuotesSpider(scrapy.Spider):
             logger.info("前台,从第" + str(self.page_index) + "页开始爬取")
             yield response.follow(next_page, headers=add_headers, callback=self.parse)
             self.first_time = False
+            return
         # 数据解析为json
         data = json.loads(response.body.decode("utf-8"))
         # 获取hits（产品信息）
@@ -94,6 +95,7 @@ class QuotesSpider(scrapy.Spider):
         nb_pages = None
         if "nbPages" in data:
             nb_pages = data["nbPages"]
+
         for hit in hits:
             self.database.handlerStatus()
             time.sleep(random.uniform(0.5, 2.5))
