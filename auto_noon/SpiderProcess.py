@@ -241,8 +241,7 @@ class SpiderProcess(object):
         self.name = name
         settings = get_project_settings()
         settings.set('USER_AGENT',
-                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                     "Chrome/70.0.3538.77 Safari/537.36")
+                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36")
         settings.set('LOG_FILE', self.name + ".log")
         settings.set('ROBOTSTXT_OBEY', False)
         settings.set('DUPEFILTER_CLASS', 'scrapy.dupefilters.BaseDupeFilter')
