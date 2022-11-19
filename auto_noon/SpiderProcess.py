@@ -171,7 +171,7 @@ class QuotesSpider(scrapy.Spider):
         second_least_price = 999999
         for offer in offers:
             # logger.info(offer)
-            is_fbn = offer["is_fbn"] == 1
+            is_fbn = "fbn" in offer["flags"]
             rating = 0.99
             if "seller_score" in offer:
                 rating = offer["seller_score"]
