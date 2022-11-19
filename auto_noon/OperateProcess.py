@@ -1,12 +1,13 @@
-import logging
-import multiprocessing
+import io
 import os
 import threading
 import time
+import zipfile
 import requests
 import json
 import traceback
 from selenium import webdriver
+from selenium.common.exceptions import SessionNotCreatedException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
@@ -14,6 +15,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from auto_noon.DataManager import DataManager
 from logger import logger
 CHROME_DRIVER_PATH = "../chromedriver.exe"
+CHROME_DRIVER_URL = "https://registry.npmmirror.com/-/binary/chromedriver/"
 
 
 class OperateProcess(object):
@@ -70,7 +72,15 @@ class OperateProcess(object):
                 }
             }
             option.add_experimental_option('prefs', prefs)
-            self.chrome = webdriver.Chrome(executable_path=CHROME_DRIVER_PATH, chrome_options=option)
+            try:
+                self.chrome = webdriver.Chrome(executable_path=CHROME_DRIVER_PATH, chrome_options=option)
+            except SessionNotCreatedException:
+                logger.info("后台,ChromeDriver版本不匹配，将尝试获取匹配版本")
+                version = \
+                traceback.format_exc().split("Current browser version is")[-1].split("with binary path")[0].split(".")[
+                    0].strip()
+                self.getChromeDriver(version)
+                continue
             # self.chrome.maximize_window()
             try:
                 self.LoginAccount()
@@ -83,6 +93,22 @@ class OperateProcess(object):
                 self.chrome.quit()
                 self.database.handlerStatus()
                 continue
+
+    # 获取对应版本的chromedriver
+    def getChromeDriver(self, version):
+        logger.info("后台,获取ChromeDriver[" + str(version) + "]")
+        ret = requests.get(CHROME_DRIVER_URL)
+        for item in ret.json():
+            if version in item["name"]:
+                logger.info("后台,找到匹配版本[" + str(item["name"]) + "]")
+                ret = requests.get(CHROME_DRIVER_URL + item["name"] + "chromedriver_win32.zip")
+                zip_data = zipfile.ZipFile(io.BytesIO(ret.content))
+                for file in zip_data.filelist:
+                    if file.filename == "chromedriver.exe":
+                        with open(CHROME_DRIVER_PATH, "wb") as f:
+                            f.write(zip_data.read(file))
+                            logger.info("后台,获取ChromeDriver成功，将重启后台")
+                        return
 
     def LoginAccount(self):
         logger.info("后台,登录账户1")
