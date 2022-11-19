@@ -168,7 +168,7 @@ class QuotesSpider(scrapy.Spider):
         gold_shop = offers[0]["store_name"].lower()
         for offer in offers:
             # logger.info(offer)
-            is_fbn = offer["is_fbn"] == 1
+            is_fbn = "fbn" in offer["flags"]
             rating = 0.99
             if "seller_score" in offer:
                 rating = offer["seller_score"]
