@@ -95,7 +95,6 @@ class QuotesSpider(scrapy.Spider):
         nb_pages = None
         if "nbPages" in data:
             nb_pages = data["nbPages"]
-
         for hit in hits:
             self.database.handlerStatus()
             time.sleep(random.uniform(0.5, 2.5))
@@ -112,7 +111,7 @@ class QuotesSpider(scrapy.Spider):
                 with open(self.shop_name + "_page_size", "w") as f:
                     f.write(str(self.page_index))
                 next_page = self.origin_start_urls[0] + "&page=" + str(self.page_index)
-                yield response.follow(next_page, callback=self.parse)
+                yield response.follow(next_page, headers=add_headers, callback=self.parse)
                 return
         with open(self.shop_name + "_page_size", "w") as f:
             f.write(str(1))
