@@ -47,7 +47,7 @@ class OperateProcess(object):
                         self.chrome.quit()
                         self.monitoring = False
             except:
-                logging.warning(traceback.format_exc())
+                logger.warning(traceback.format_exc())
             self.mutex.release()
             time.sleep(1)
 
@@ -298,7 +298,7 @@ class OperateProcess(object):
                         limit -= 1
             except:
                 self.reset_monitor(False)
-                logger.info("后台," + traceback.print_exc())
+                logger.info("后台," + traceback.format_exc())
                 error_count += 1
                 if error_count > 3:
                     raise
